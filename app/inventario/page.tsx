@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus, AlertTriangle } from 'lucide-react'
+import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus, AlertTriangle, X } from 'lucide-react'
 
 interface Producto {
   id: string
@@ -30,6 +30,9 @@ export default function InventarioPage() {
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
+  
+  // Estado para cerrar el cartel flotante de stock bajo
+  const [cerrarAlertaStock, setCerrarAlertaStock] = useState(false)
 
   const fetchProductos = async () => {
     const { data } = await supabase.from('productos').select('*').order('id', { ascending: false })
@@ -149,6 +152,9 @@ export default function InventarioPage() {
     return coincideTexto && p.nombre.toLowerCase().includes(filtroCategoria)
   })
 
+  // Cantidad de productos con stock bajo
+  const cantidadStockBajo = productos.filter(p => p.stock_actual <= 5).length
+
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
       {/* Header */}
@@ -163,6 +169,39 @@ export default function InventarioPage() {
           </div>
         </div>
       </div>
+
+      {/* CARTEL FLOTANTE DE ALERTA DE STOCK BAJO (Arriba, al lado/debajo del header con botón X) */}
+      {cantidadStockBajo > 0 && !cerrarAlertaStock && (
+        <div className="mb-4 bg-amber-50 border border-amber-300 p-3 rounded-xl shadow-sm flex items-center justify-between gap-3 transition">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-amber-500 text-white p-2 rounded-lg shrink-0">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-900">¡Hay {cantidadStockBajo} producto(s) con stock bajo!</p>
+              <p className="text-[11px] text-amber-700">Revisá la lista para reponer mercadería.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setFiltroCategoria('bajo')
+                // Opcional: scrollear hacia la lista
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition"
+            >
+              Ver
+            </button>
+            <button
+              onClick={() => setCerrarAlertaStock(true)}
+              className="text-amber-500 hover:text-amber-800 p-1 rounded-lg"
+              title="Cerrar aviso"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {mensaje && (
         <div
