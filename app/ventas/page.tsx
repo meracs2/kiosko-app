@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { ArrowLeft, Camera, Plus, Minus, X, ShoppingBag, Banknote, CreditCard, QrCode, Search, Tag } from 'lucide-react'
+import { ArrowLeft, Camera, Plus, Minus, X, ShoppingBag, Banknote, CreditCard, QrCode, Search, Tag, Split } from 'lucide-react'
 
 interface ItemInventario {
   id: string
@@ -26,7 +26,12 @@ export default function VentasPage() {
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
+  
+  // Estados para montos de pago dividido
+  const [pagoEfectivo, setPagoEfectivo] = useState('')
+  const [pagoTarjeta, setPagoTarjeta] = useState('')
+  const [pagoTransf, setPagoTransf] = useState('')
+
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
@@ -87,14 +92,12 @@ export default function VentasPage() {
     const textoLimpio = texto.trim()
     if (!textoLimpio) return
 
-    // 1. Buscar por coincidencia exacta de código de barras o QR
     const itemPorCodigo = inventarioTotal.find((p) => p.codigo_barras === textoLimpio)
     if (itemPorCodigo) {
       agregarAlCarrito(itemPorCodigo)
       return
     }
 
-    // 2. Si hay coincidencias parciales por nombre o número, tomar el primer resultado
     const coincidencias = inventarioTotal.filter((p) =>
       p.nombre.toLowerCase().includes(textoLimpio.toLowerCase()) ||
       (p.codigo_barras && p.codigo_barras.includes(textoLimpio))
@@ -118,7 +121,6 @@ export default function VentasPage() {
     setMostrarEscaner(false)
   }
 
-  // Sugerencias abiertas: busca tanto por nombre como por número de código/QR si tiene al menos 1 caracter
   const textoTrim = busqueda.trim()
   const itemsSugeridos = textoTrim.length === 0 ? [] : inventarioTotal.filter((p) =>
     p.nombre.toLowerCase().includes(textoTrim.toLowerCase()) ||
@@ -127,14 +129,49 @@ export default function VentasPage() {
 
   const totalVenta = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0)
 
+  // Totales ingresados en los inputs de pago
+  const valEfectivo = parseFloat(pagoEfectivo) || 0
+  const valTarjeta = parseFloat(pagoTarjeta) || 0
+  const valTransf = parseFloat(pagoTransf) || 0
+  const totalIngresado = valEfectivo + valTarjeta + valTransf
+
+  // Funciones de autopago rápido (si quieren cobrar todo con un solo medio haciendo clic en un botón)
+  const pagarTodoCon = (tipo: 'efectivo' | 'tarjeta' | 'transferencia') => {
+    setPagoEfectivo('')
+    setPagoTarjeta('')
+    setPagoTransf('')
+    if (tipo === 'efectivo') setPagoEfectivo(totalVenta.toString())
+    if (tipo === 'tarjeta') setPagoTarjeta(totalVenta.toString())
+    if (tipo === 'transferencia') setPagoTransf(totalVenta.toString())
+  }
+
   const finalizarVenta = async () => {
     if (carrito.length === 0) return
+
+    // Validamos que el total ingresado coincida exactamente con el carrito
+    if (Math.abs(totalIngresado - totalVenta) > 0.01) {
+      setMensaje('Error: La suma de los pagos debe ser igual al total del carrito ($' + totalVenta.toLocaleString() + ')')
+      return
+    }
+
     setCargando(true)
     setMensaje('')
 
+    // Determinamos el método principal o si fue mixto
+    let metodoFinal = 'mixto'
+    if (valEfectivo > 0 && valTarjeta === 0 && valTransf === 0) metodoFinal = 'efectivo'
+    else if (valTarjeta > 0 && valEfectivo === 0 && valTransf === 0) metodoFinal = 'tarjeta'
+    else if (valTransf > 0 && valEfectivo === 0 && valTarjeta === 0) metodoFinal = 'transferencia'
+
     const { data: venta, error: errVenta } = await supabase
       .from('ventas')
-      .insert([{ total: totalVenta, metodo_pago: metodoPago }])
+      .insert([{
+        total: totalVenta,
+        metodo_pago: metodoFinal,
+        pago_efectivo: valEfectivo,
+        pago_tarjeta: valTarjeta,
+        pago_transferencia: valTransf
+      }])
       .select()
       .single()
 
@@ -167,6 +204,9 @@ export default function VentasPage() {
     setCargando(false)
     setMensaje('¡Venta registrada con éxito!')
     setCarrito([])
+    setPagoEfectivo('')
+    setPagoTarjeta('')
+    setPagoTransf('')
   }
 
   return (
@@ -181,14 +221,14 @@ export default function VentasPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 leading-tight">Cobrar Cliente</h1>
-            <p className="text-xs text-gray-500">Punto de venta y control de orden</p>
+            <p className="text-xs text-gray-500">Punto de venta y pagos mixtos</p>
           </div>
         </div>
       </div>
 
       {mensaje && (
         <div
-          className={`p-3 mb-4 rounded text-sm ${
+          className={`p-3 mb-4 rounded text-sm font-medium ${
             mensaje.includes('Error') || mensaje.includes('no encontrado')
               ? 'bg-red-100 text-red-700'
               : 'bg-green-100 text-green-700'
@@ -198,7 +238,7 @@ export default function VentasPage() {
         </div>
       )}
 
-      {/* Barra de búsqueda unificada (Texto, Código de Barras o QR) */}
+      {/* Barra de búsqueda unificada */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-4 relative">
         <label className="block text-xs font-semibold text-gray-600 mb-1">
           Buscar por Nombre, Código de Barras o QR
@@ -319,53 +359,97 @@ export default function VentasPage() {
         )}
       </div>
 
-      {/* Métodos de Pago y Cobro */}
+      {/* Sección de Pagos Mixtos y Cobro */}
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <label className="block text-xs font-semibold text-gray-600 mb-2">Medio de Pago</label>
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => setMetodoPago('efectivo')}
-            className={`py-2 px-1 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 transition ${
-              metodoPago === 'efectivo'
-                ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                : 'border-gray-200 text-gray-600'
-            }`}
-          >
-            <Banknote size={16} /> Efectivo
-          </button>
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+            <Split size={14} /> Desglose de Medios de Pago
+          </label>
+          <span className="text-xs font-bold text-gray-700">
+            Total: <span className="text-green-600">${totalVenta.toLocaleString()}</span>
+          </span>
+        </div>
 
+        {/* Botones rápidos para llenar 100% con un método */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <button
             type="button"
-            onClick={() => setMetodoPago('tarjeta')}
-            className={`py-2 px-1 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 transition ${
-              metodoPago === 'tarjeta'
-                ? 'bg-blue-50 border-blue-500 text-blue-700'
-                : 'border-gray-200 text-gray-600'
-            }`}
+            onClick={() => pagarTodoCon('efectivo')}
+            className="py-1.5 px-1 bg-gray-50 border rounded text-[11px] font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition"
           >
-            <CreditCard size={16} /> Tarjeta
+            Todo Efectivo
           </button>
-
           <button
             type="button"
-            onClick={() => setMetodoPago('transferencia')}
-            className={`py-2 px-1 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 transition ${
-              metodoPago === 'transferencia'
-                ? 'bg-purple-50 border-purple-500 text-purple-700'
-                : 'border-gray-200 text-gray-600'
-            }`}
+            onClick={() => pagarTodoCon('tarjeta')}
+            className="py-1.5 px-1 bg-gray-50 border rounded text-[11px] font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition"
           >
-            <QrCode size={16} /> Transf.
+            Todo Tarjeta
+          </button>
+          <button
+            type="button"
+            onClick={() => pagarTodoCon('transferencia')}
+            className="py-1.5 px-1 bg-gray-50 border rounded text-[11px] font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition"
+          >
+            Todo Transf.
           </button>
         </div>
 
+        {/* Inputs numéricos divididos */}
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-600 w-24 flex items-center gap-1">
+              <Banknote size={14} className="text-emerald-600" /> Efectivo:
+            </span>
+            <input
+              type="number"
+              placeholder="0"
+              value={pagoEfectivo}
+              onChange={(e) => setPagoEfectivo(e.target.value)}
+              className="w-full p-2 border rounded-lg bg-gray-50 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-600 w-24 flex items-center gap-1">
+              <CreditCard size={14} className="text-blue-600" /> Tarjeta:
+            </span>
+            <input
+              type="number"
+              placeholder="0"
+              value={pagoTarjeta}
+              onChange={(e) => setPagoTarjeta(e.target.value)}
+              className="w-full p-2 border rounded-lg bg-gray-50 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-600 w-24 flex items-center gap-1">
+              <QrCode size={14} className="text-purple-600" /> Transf.:
+            </span>
+            <input
+              type="number"
+              placeholder="0"
+              value={pagoTransf}
+              onChange={(e) => setPagoTransf(e.target.value)}
+              className="w-full p-2 border rounded-lg bg-gray-50 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+        </div>
+
+        {/* Alerta si el monto ingresado no empareja con el carrito */}
+        {totalIngresado !== totalVenta && carrito.length > 0 && (
+          <div className="text-[11px] font-bold text-amber-600 bg-amber-50 p-2 rounded mb-3 text-center">
+            Falta cubrir: ${(totalVenta - totalIngresado).toLocaleString()}
+          </div>
+        )}
+
         <button
           onClick={finalizarVenta}
-          disabled={cargando || carrito.length === 0}
+          disabled={cargando || carrito.length === 0 || totalIngresado !== totalVenta}
           className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-3.5 rounded-xl font-bold text-lg shadow-sm transition flex items-center justify-between px-4 active:scale-95"
         >
-          <span>{cargando ? 'Registrando...' : 'Cobrar'}</span>
+          <span>{cargando ? 'Registrando...' : 'Cobrar Venta'}</span>
           <span className="text-xl font-extrabold">${totalVenta.toLocaleString()}</span>
         </button>
       </div>
