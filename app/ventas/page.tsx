@@ -1,7 +1,7 @@
 // app/ventas/page.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
@@ -28,9 +28,6 @@ export default function VentasPage() {
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
   const [kioskoId, setKioskoId] = useState<string | null>(null)
   
-  // Referencia para abrir la cámara nativa directamente en dispositivos móviles
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  
   // Estados para montos de pago dividido
   const [pagoEfectivo, setPagoEfectivo] = useState('')
   const [pagoTarjeta, setPagoTarjeta] = useState('')
@@ -41,7 +38,6 @@ export default function VentasPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Obtenemos la sesión actual para sacar el kiosko_id del usuario
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
@@ -54,7 +50,6 @@ export default function VentasPage() {
       if (perfil?.kiosko_id) {
         setKioskoId(perfil.kiosko_id)
 
-        // Consultamos productos filtrados por el kiosko del usuario
         const { data: prods } = await supabase
           .from('productos')
           .select('*')
@@ -64,7 +59,6 @@ export default function VentasPage() {
           setProductos(prods.map(p => ({ ...p, esPromo: false })))
         }
 
-        // Consultamos promos filtradas por el kiosko del usuario
         const { data: promos } = await supabase
           .from('promociones')
           .select('*')
@@ -144,17 +138,9 @@ export default function VentasPage() {
       agregarAlCarrito(item)
       setMensaje('')
     } else {
-      setMensaje('Código escaneado no encontrado')
+      setMensaje('Código escaneado no encontrado: ' + codigo)
     }
     setMostrarEscaner(false)
-  }
-
-  // Manejador para la captura directa con la cámara nativa del celular
-  const handleFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setMensaje('Imagen de cámara capturada correctamente.')
-    }
   }
 
   const textoTrim = busqueda.trim()
@@ -165,13 +151,11 @@ export default function VentasPage() {
 
   const totalVenta = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0)
 
-  // Totales ingresados en los inputs de pago
   const valEfectivo = parseFloat(pagoEfectivo) || 0
   const valTarjeta = parseFloat(pagoTarjeta) || 0
   const valTransf = parseFloat(pagoTransf) || 0
   const totalIngresado = valEfectivo + valTarjeta + valTransf
 
-  // Funciones de autopago rápido
   const pagarTodoCon = (tipo: 'efectivo' | 'tarjeta' | 'transferencia') => {
     setPagoEfectivo('')
     setPagoTarjeta('')
@@ -184,7 +168,6 @@ export default function VentasPage() {
   const finalizarVenta = async () => {
     if (carrito.length === 0 || !kioskoId) return
 
-    // Validamos que el total ingresado coincida exactamente con el carrito
     if (Math.abs(totalIngresado - totalVenta) > 0.01) {
       setMensaje('Error: La suma de los pagos debe ser igual al total del carrito ($' + totalVenta.toLocaleString() + ')')
       return
@@ -193,13 +176,11 @@ export default function VentasPage() {
     setCargando(true)
     setMensaje('')
 
-    // Determinamos el método principal o si fue mixto
     let metodoFinal = 'mixto'
     if (valEfectivo > 0 && valTarjeta === 0 && valTransf === 0) metodoFinal = 'efectivo'
     else if (valTarjeta > 0 && valEfectivo === 0 && valTransf === 0) metodoFinal = 'tarjeta'
     else if (valTransf > 0 && valEfectivo === 0 && valTarjeta === 0) metodoFinal = 'transferencia'
 
-    // INSERTamos la venta incluyendo obligatoriamente el kiosko_id
     const { data: venta, error: errVenta } = await supabase
       .from('ventas')
       .insert([{
@@ -230,7 +211,6 @@ export default function VentasPage() {
         },
       ])
 
-      // Si no es promo, consultamos y restamos el stock asegurando compatibilidad en el ID y el kiosko
       if (!item.esPromo) {
         const { data: productoActual } = await supabase
           .from('productos')
@@ -243,17 +223,11 @@ export default function VentasPage() {
           const stockActualEnDB = Number(productoActual.stock_actual) || 0
           const nuevoStock = stockActualEnDB - Number(item.cantidad)
 
-          const { error: errorStock } = await supabase
+          await supabase
             .from('productos')
             .update({ stock_actual: nuevoStock >= 0 ? nuevoStock : 0 })
             .eq('id', String(item.id))
             .eq('kiosko_id', kioskoId)
-
-          if (errorStock) {
-            console.error('Error al actualizar stock de:', item.nombre, errorStock.message)
-          }
-        } else {
-          console.error('No se encontró el producto en la DB con ID:', item.id)
         }
       }
     }
@@ -268,16 +242,6 @@ export default function VentasPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Input de archivo oculto para forzar la cámara trasera directamente en móviles */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFileCapture}
-      />
-
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-3">
           <Link
@@ -325,9 +289,9 @@ export default function VentasPage() {
 
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setMostrarEscaner(true)}
             className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-blue-700 transition"
-            title="Abrir cámara directamente"
+            title="Abrir cámara de escaneo"
           >
             <Camera size={18} />
           </button>
@@ -432,7 +396,6 @@ export default function VentasPage() {
           </span>
         </div>
 
-        {/* Botones rápidos para llenar 100% con un método */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           <button
             type="button"
@@ -457,7 +420,6 @@ export default function VentasPage() {
           </button>
         </div>
 
-        {/* Inputs numéricos divididos */}
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-600 w-24 flex items-center gap-1">
@@ -499,7 +461,6 @@ export default function VentasPage() {
           </div>
         </div>
 
-        {/* Alerta si el monto ingresado no empareja con el carrito */}
         {totalIngresado !== totalVenta && carrito.length > 0 && (
           <div className="text-[11px] font-bold text-amber-600 bg-amber-50 p-2 rounded mb-3 text-center">
             Falta cubrir: ${(totalVenta - totalIngresado).toLocaleString()}
@@ -515,6 +476,24 @@ export default function VentasPage() {
           <span className="text-xl font-extrabold">${totalVenta.toLocaleString()}</span>
         </button>
       </div>
+
+      {/* MODAL DEL ESCÁNER DE CÁMARA */}
+      {mostrarEscaner && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-xl">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-gray-800 text-sm">Escaneá el código de barras o QR</h3>
+              <button
+                onClick={() => setMostrarEscaner(false)}
+                className="p-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <Scanner onScan={handleScan} />
+          </div>
+        </div>
+      )}
     </main>
   )
 }

@@ -1,7 +1,7 @@
 // app/inventario/page.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
@@ -20,7 +20,6 @@ export default function InventarioPage() {
   const [modo, setModo] = useState<'nuevo' | 'restock'>('nuevo')
   const [kioskoId, setKioskoId] = useState<string | null>(null)
   
-  // Campos del formulario
   const [nombre, setNombre] = useState('')
   const [codigoBarras, setCodigoBarras] = useState('')
   const [precio, setPrecio] = useState('')
@@ -31,11 +30,7 @@ export default function InventarioPage() {
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
-  
-  // Referencias para disparar la cámara nativa directamente
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Estado para cerrar el cartel flotante de stock bajo superior
   const [cerrarAlertaStock, setCerrarAlertaStock] = useState(false)
 
   const fetchProductos = async (idKiosko: string) => {
@@ -67,7 +62,6 @@ export default function InventarioPage() {
     inicializarKiosko()
   }, [])
 
-  // 1. Crear producto desde cero incluyendo el kiosko_id
   const guardarProductoNuevo = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!kioskoId) return
@@ -102,7 +96,6 @@ export default function InventarioPage() {
     }
   }
 
-  // 2. Solo reponer unidades a un producto existente filtrando por su kiosko
   const reponerStock = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!kioskoId) return
@@ -169,17 +162,6 @@ export default function InventarioPage() {
     fetchProductos(kioskoId)
   }
 
-  // Manejador para la captura directa con la cámara nativa del celular
-  const handleFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Aquí podés procesar la imagen o simplemente simular un código para pruebas,
-      // o bien integrar un lector de códigos basado en imagen si lo deseas.
-      setMensaje('Imagen de cámara capturada correctamente.')
-    }
-  }
-
-  // Filtrado por buscador y por botones rápidos de categoría
   const productosFiltrados = productos.filter((p) => {
     const coincideTexto =
       p.nombre.toLowerCase().includes(busquedaStock.toLowerCase()) ||
@@ -191,22 +173,10 @@ export default function InventarioPage() {
     return coincideTexto && p.nombre.toLowerCase().includes(filtroCategoria)
   })
 
-  // Cantidad de productos con stock bajo
   const cantidadStockBajo = productos.filter(p => p.stock_actual <= 5).length
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Input de archivo oculto para forzar la cámara trasera directamente en móviles */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFileCapture}
-      />
-
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2.5 bg-white border shadow-sm hover:bg-gray-100 text-gray-700 rounded-xl active:scale-95 transition flex items-center justify-center shrink-0">
@@ -219,7 +189,6 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* CARTEL FLOTANTE DE ALERTA DE STOCK BAJO */}
       {cantidadStockBajo > 0 && !cerrarAlertaStock && (
         <div className="mb-4 bg-amber-50 border border-amber-300 p-3 rounded-xl shadow-sm flex items-center justify-between gap-3 transition">
           <div className="flex items-center gap-2.5">
@@ -259,7 +228,6 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* Selectores de Modo */}
       <div className="flex bg-gray-200 p-1 rounded-xl mb-4 text-xs font-bold">
         <button
           onClick={() => { setModo('nuevo'); limpiarFormulario(); setMensaje(''); }}
@@ -279,7 +247,6 @@ export default function InventarioPage() {
         </button>
       </div>
 
-      {/* Formulario 1: Crear Producto Nuevo */}
       {modo === 'nuevo' && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Cargar Producto Nuevo</h2>
@@ -298,9 +265,9 @@ export default function InventarioPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => setMostrarEscaner(true)}
                   className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-blue-700 transition"
-                  title="Abrir cámara directamente"
+                  title="Abrir cámara"
                 >
                   <Camera size={18} />
                 </button>
@@ -357,7 +324,6 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* Formulario 2: Reponer Stock a Producto Existente */}
       {modo === 'restock' && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Ingreso / Reposición de Mercadería</h2>
@@ -380,9 +346,9 @@ export default function InventarioPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => setMostrarEscaner(true)}
                   className="bg-emerald-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-emerald-700 transition"
-                  title="Abrir cámara directamente"
+                  title="Abrir cámara"
                 >
                   <Camera size={18} />
                 </button>
@@ -419,11 +385,9 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* Lista de Productos con Buscador y Filtros Rápidos */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Lista de Stock Actual</h2>
 
-        {/* Buscador de texto */}
         <div className="relative mb-3">
           <input
             type="text"
@@ -435,7 +399,6 @@ export default function InventarioPage() {
           <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
         </div>
 
-        {/* Botones de Filtro Rápido */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 text-xs">
           <button
             onClick={() => setFiltroCategoria('todos')}
@@ -520,6 +483,31 @@ export default function InventarioPage() {
           </div>
         )}
       </div>
+
+      {/* MODAL DEL ESCÁNER DE CÁMARA */}
+      {mostrarEscaner && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-xl">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-gray-800 text-sm">Apunta la cámara al código</h3>
+              <button
+                onClick={() => setMostrarEscaner(false)}
+                className="p-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <Scanner
+              onScan={(codigo) => {
+                setCodigoBarras(codigo)
+                const prod = productos.find((p) => p.codigo_barras === codigo)
+                if (prod) setNombre(prod.nombre)
+                setMostrarEscaner(false)
+              }}
+            />
+          </div>
+        </div>
+      )}
     </main>
   )
 }
