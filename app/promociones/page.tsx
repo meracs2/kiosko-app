@@ -1,4 +1,4 @@
-// app/carga/page.tsx
+// app/promociones/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -12,7 +12,6 @@ interface Promocion {
   nombre: string
   descripcion: string
   precio: number
-  created_at: string
 }
 
 export default function PromocionesPage() {
@@ -37,7 +36,7 @@ export default function PromocionesPage() {
     const { data, error } = await supabase
       .from('promociones')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
     
     if (error) {
       setMensaje('Error técnico al cargar promociones: ' + error.message)
