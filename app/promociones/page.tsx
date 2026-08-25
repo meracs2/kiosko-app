@@ -4,9 +4,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Tag, ShoppingBag, PackageSearch } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Tag } from 'lucide-react'
 
-// Interfaces técnicas basadas en la base de datos
+// Interfaces basadas en la base de datos
 interface Promocion {
   id: string
   nombre: string
@@ -17,8 +17,9 @@ interface Promocion {
 export default function PromocionesPage() {
   const [promociones, setPromociones] = useState<Promocion[]>([])
   const [modo, setModo] = useState<'lista' | 'nuevo'>('lista')
+  const [kioskoId, setKioskoId] = useState<string | null>(null)
   
-  // Campos del formulario técnico
+  // Campos del formulario
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
@@ -26,34 +27,53 @@ export default function PromocionesPage() {
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
-  // Cargar datos técnicos al inicio
-  useEffect(() => {
-    fetchPromociones()
-  }, [])
-
-  const fetchPromociones = async () => {
+  const fetchPromociones = async (idKiosko: string) => {
     setCargando(true)
     const { data, error } = await supabase
       .from('promociones')
       .select('*')
+      .eq('kiosko_id', idKiosko)
       .order('id', { ascending: false })
     
     if (error) {
-      setMensaje('Error técnico al cargar promociones: ' + error.message)
+      setMensaje('Error al cargar promociones: ' + error.message)
     } else if (data) {
       setPromociones(data)
     }
     setCargando(false)
   }
 
-  // Guardar una nueva promoción
+  // Cargar datos al inicio y resolver el kiosko_id del usuario logueado
+  useEffect(() => {
+    const inicializarKiosko = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('kiosko_id')
+        .eq('id', session.user.id)
+        .single()
+
+      if (perfil?.kiosko_id) {
+        setKioskoId(perfil.kiosko_id)
+        fetchPromociones(perfil.kiosko_id)
+      }
+    }
+    inicializarKiosko()
+  }, [])
+
+  // Guardar una nueva promoción incluyendo el kiosko_id
   const guardarPromocion = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!kioskoId) return
+
     setCargando(true)
     setMensaje('')
 
     const { error } = await supabase.from('promociones').insert([
       {
+        kiosko_id: kioskoId,
         nombre,
         descripcion,
         precio: parseFloat(precio) || 0,
@@ -62,12 +82,12 @@ export default function PromocionesPage() {
 
     setCargando(false)
     if (error) {
-      setMensaje('Error técnico al guardar: ' + error.message)
+      setMensaje('Error al guardar: ' + error.message)
     } else {
       setMensaje('¡Promoción cargada con éxito!')
       limpiarFormulario()
       setModo('lista')
-      fetchPromociones()
+      fetchPromociones(kioskoId)
     }
   }
 
@@ -78,20 +98,26 @@ export default function PromocionesPage() {
   }
 
   const eliminarPromocion = async (id: string) => {
-    if (!confirm('¿Seguro técnico de que querés eliminar esta promoción?')) return
+    if (!kioskoId) return
+    if (!confirm('¿Seguro de que querés eliminar esta promoción?')) return
     
-    const { error } = await supabase.from('promociones').delete().eq('id', id)
+    const { error } = await supabase
+      .from('promociones')
+      .delete()
+      .eq('id', id)
+      .eq('kiosko_id', kioskoId)
+
     if (error) {
-      setMensaje('Error técnico al eliminar: ' + error.message)
+      setMensaje('Error al eliminar: ' + error.message)
     } else {
-      setMensaje('¡Promoción eliminada técnico!')
-      fetchPromociones()
+      setMensaje('¡Promoción eliminada con éxito!')
+      fetchPromociones(kioskoId)
     }
   }
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Header técnico */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <Link
@@ -102,7 +128,7 @@ export default function PromocionesPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 leading-tight">Promociones</h1>
-            <p className="text-xs text-gray-500">Combos y ofertas vigentes técnicos</p>
+            <p className="text-xs text-gray-500">Combos y ofertas vigentes</p>
           </div>
         </div>
 
@@ -119,20 +145,20 @@ export default function PromocionesPage() {
       {mensaje && (
         <div
           className={`p-3 mb-4 rounded text-sm ${
-            mensaje.includes('Error técnico') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+            mensaje.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
           }`}
         >
           {mensaje}
         </div>
       )}
 
-      {/* Modo 1: Lista de Promociones Cargadas técnicos */}
+      {/* Modo 1: Lista de Promociones Cargadas */}
       {modo === 'lista' && (
         <div className="space-y-4">
           {cargando ? (
-            <p className="text-center text-gray-400 py-4 text-sm">Cargando promociones técnicos...</p>
+            <p className="text-center text-gray-400 py-4 text-sm">Cargando promociones...</p>
           ) : promociones.length === 0 ? (
-            <p className="text-center text-gray-400 py-4 text-sm">No hay promociones cargadas técnicos.</p>
+            <p className="text-center text-gray-400 py-4 text-sm">No hay promociones cargadas.</p>
           ) : (
             promociones.map((promo) => (
               <div key={promo.id} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
@@ -161,14 +187,14 @@ export default function PromocionesPage() {
         </div>
       )}
 
-      {/* Modo 2: Cargar Nueva Promoción técnico */}
+      {/* Modo 2: Cargar Nueva Promoción */}
       {modo === 'nuevo' && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Cargar Promoción Nueva técnico</h2>
+          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Cargar Promoción Nueva</h2>
           
           <form onSubmit={guardarPromocion} className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Nombre técnico (Ej: Fernet Branca combo)</label>
+              <label className="block text-xs text-gray-500 mb-1">Nombre (Ej: Combo Fernet)</label>
               <input
                 type="text"
                 value={nombre}
@@ -180,7 +206,7 @@ export default function PromocionesPage() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Descripción técnica (Ej: 1 Fernet + 2 Coca 1.5L)</label>
+              <label className="block text-xs text-gray-500 mb-1">Descripción (Ej: 1 Fernet + 2 Coca 1.5L)</label>
               <input
                 type="text"
                 value={descripcion}
@@ -191,7 +217,7 @@ export default function PromocionesPage() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Precio técnico del Combo ($)</label>
+              <label className="block text-xs text-gray-500 mb-1">Precio del Combo ($)</label>
               <input
                 type="number"
                 step="0.01"
@@ -209,14 +235,14 @@ export default function PromocionesPage() {
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
             >
               <Plus size={18} />
-              {cargando ? 'Guardando técnico...' : 'Guardar Promoción técnico'}
+              {cargando ? 'Guardando...' : 'Guardar Promoción'}
             </button>
             <button
               type="button"
               onClick={() => setModo('lista')}
               className="w-full bg-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium transition active:scale-95 mt-1"
             >
-              Cancelar técnico
+              Cancelar
             </button>
           </form>
         </div>

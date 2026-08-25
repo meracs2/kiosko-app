@@ -28,6 +28,7 @@ export default function CajaPage() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [cargando, setCargando] = useState(true)
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null)
+  const [kioskoId, setKioskoId] = useState<string | null>(null)
 
   // Fecha del último cierre guardada en el navegador (en milisegundos)
   const [ultimoCierre, setUltimoCierre] = useState<number>(0)
@@ -37,11 +38,12 @@ export default function CajaPage() {
   const [manualTarjeta, setManualTarjeta] = useState('')
   const [manualTransf, setManualTransf] = useState('')
 
-  const fetchVentas = async () => {
+  const fetchVentas = async (idKiosko: string) => {
     setCargando(true)
     const { data } = await supabase
       .from('ventas')
       .select('*, detalle_ventas(*)')
+      .eq('kiosko_id', idKiosko)
       .order('created_at', { ascending: false })
 
     if (data) setVentas(data)
@@ -49,7 +51,23 @@ export default function CajaPage() {
   }
 
   useEffect(() => {
-    fetchVentas()
+    const inicializarKiosko = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('kiosko_id')
+        .eq('id', session.user.id)
+        .single()
+
+      if (perfil?.kiosko_id) {
+        setKioskoId(perfil.kiosko_id)
+        fetchVentas(perfil.kiosko_id)
+      }
+    }
+    inicializarKiosko()
+
     const cierreGuardado = localStorage.getItem('kiosko_ultimo_cierre')
     if (cierreGuardado) {
       setUltimoCierre(Number(cierreGuardado))
@@ -125,7 +143,7 @@ export default function CajaPage() {
         </div>
 
         <button
-          onClick={fetchVentas}
+          onClick={() => kioskoId && fetchVentas(kioskoId)}
           className="bg-white border text-gray-700 p-2.5 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition"
         >
           <RefreshCw size={18} className={cargando ? 'animate-spin' : ''} />

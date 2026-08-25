@@ -18,6 +18,7 @@ interface Producto {
 export default function InventarioPage() {
   const [productos, setProductos] = useState<Producto[]>([])
   const [modo, setModo] = useState<'nuevo' | 'restock'>('nuevo')
+  const [kioskoId, setKioskoId] = useState<string | null>(null)
   
   // Campos del formulario
   const [nombre, setNombre] = useState('')
@@ -34,18 +35,40 @@ export default function InventarioPage() {
   // Estado para cerrar el cartel flotante de stock bajo superior
   const [cerrarAlertaStock, setCerrarAlertaStock] = useState(false)
 
-  const fetchProductos = async () => {
-    const { data } = await supabase.from('productos').select('*').order('id', { ascending: false })
+  const fetchProductos = async (idKiosko: string) => {
+    const { data } = await supabase
+      .from('productos')
+      .select('*')
+      .eq('kiosko_id', idKiosko)
+      .order('id', { ascending: false })
+      
     if (data) setProductos(data)
   }
 
   useEffect(() => {
-    fetchProductos()
+    const inicializarKiosko = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('kiosko_id')
+        .eq('id', session.user.id)
+        .single()
+
+      if (perfil?.kiosko_id) {
+        setKioskoId(perfil.kiosko_id)
+        fetchProductos(perfil.kiosko_id)
+      }
+    }
+    inicializarKiosko()
   }, [])
 
-  // 1. Crear producto desde cero
+  // 1. Crear producto desde cero incluyendo el kiosko_id
   const guardarProductoNuevo = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!kioskoId) return
+
     setCargando(true)
     setMensaje('')
 
@@ -58,6 +81,7 @@ export default function InventarioPage() {
 
     const { error } = await supabase.from('productos').insert([
       {
+        kiosko_id: kioskoId,
         nombre,
         codigo_barras: codigoBarras,
         precio: parseFloat(precio),
@@ -71,13 +95,15 @@ export default function InventarioPage() {
     } else {
       setMensaje('¡Producto nuevo guardado con éxito!')
       limpiarFormulario()
-      fetchProductos()
+      fetchProductos(kioskoId)
     }
   }
 
-  // 2. Solo reponer unidades a un producto existente
+  // 2. Solo reponer unidades a un producto existente filtrando por su kiosko
   const reponerStock = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!kioskoId) return
+
     setCargando(true)
     setMensaje('')
 
@@ -93,6 +119,7 @@ export default function InventarioPage() {
       .from('productos')
       .update({ stock_actual: nuevoStock })
       .eq('id', productoTarget.id)
+      .eq('kiosko_id', kioskoId)
 
     setCargando(false)
     if (error) {
@@ -100,7 +127,7 @@ export default function InventarioPage() {
     } else {
       setMensaje(`¡Se sumaron ${stock} unidades a ${productoTarget.nombre}! Total: ${nuevoStock}`)
       limpiarFormulario()
-      fetchProductos()
+      fetchProductos(kioskoId)
     }
   }
 
@@ -112,18 +139,31 @@ export default function InventarioPage() {
   }
 
   const sumarUnidadesDirecto = async (prod: Producto) => {
+    if (!kioskoId) return
     const ingreso = prompt(`¿Cuántas unidades ingresaron para "${prod.nombre}"?`, '10')
     if (!ingreso || isNaN(Number(ingreso))) return
 
     const nuevoStock = prod.stock_actual + parseInt(ingreso)
-    await supabase.from('productos').update({ stock_actual: nuevoStock }).eq('id', prod.id)
-    fetchProductos()
+    await supabase
+      .from('productos')
+      .update({ stock_actual: nuevoStock })
+      .eq('id', prod.id)
+      .eq('kiosko_id', kioskoId)
+
+    fetchProductos(kioskoId)
   }
 
   const eliminarProducto = async (id: string) => {
+    if (!kioskoId) return
     if (!confirm('¿Seguro que querés eliminar este producto?')) return
-    await supabase.from('productos').delete().eq('id', id)
-    fetchProductos()
+    
+    await supabase
+      .from('productos')
+      .delete()
+      .eq('id', id)
+      .eq('kiosko_id', kioskoId)
+
+    fetchProductos(kioskoId)
   }
 
   const handleScan = (codigo: string) => {
@@ -170,7 +210,7 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* CARTEL FLOTANTE DE ALERTA DE STOCK BAJO (Arriba con botón de cierre X) */}
+      {/* CARTEL FLOTANTE DE ALERTA DE STOCK BAJO */}
       {cantidadStockBajo > 0 && !cerrarAlertaStock && (
         <div className="mb-4 bg-amber-50 border border-amber-300 p-3 rounded-xl shadow-sm flex items-center justify-between gap-3 transition">
           <div className="flex items-center gap-2.5">
@@ -396,7 +436,7 @@ export default function InventarioPage() {
           <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
         </div>
 
-        {/* Botones de Filtro Rápido (Sin botón de stock bajo) */}
+        {/* Botones de Filtro Rápido */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 text-xs">
           <button
             onClick={() => setFiltroCategoria('todos')}

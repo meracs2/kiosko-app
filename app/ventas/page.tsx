@@ -26,6 +26,7 @@ export default function VentasPage() {
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
+  const [kioskoId, setKioskoId] = useState<string | null>(null)
   
   // Estados para montos de pago dividido
   const [pagoEfectivo, setPagoEfectivo] = useState('')
@@ -37,14 +38,38 @@ export default function VentasPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: prods } = await supabase.from('productos').select('*')
-      if (prods) {
-        setProductos(prods.map(p => ({ ...p, esPromo: false })))
-      }
+      // Obtenemos la sesión actual para sacar el kiosko_id del usuario
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
 
-      const { data: promos } = await supabase.from('promociones').select('*')
-      if (promos) {
-        setPromociones(promos.map(p => ({ ...p, esPromo: true, stock_actual: 999 })))
+      const { data: perfil } = await supabase
+        .from('perfiles')
+        .select('kiosko_id')
+        .eq('id', session.user.id)
+        .single()
+
+      if (perfil?.kiosko_id) {
+        setKioskoId(perfil.kiosko_id)
+
+        // Consultamos productos filtrados por el kiosko del usuario
+        const { data: prods } = await supabase
+          .from('productos')
+          .select('*')
+          .eq('kiosko_id', perfil.kiosko_id)
+
+        if (prods) {
+          setProductos(prods.map(p => ({ ...p, esPromo: false })))
+        }
+
+        // Consultamos promos filtradas por el kiosko del usuario
+        const { data: promos } = await supabase
+          .from('promociones')
+          .select('*')
+          .eq('kiosko_id', perfil.kiosko_id)
+
+        if (promos) {
+          setPromociones(promos.map(p => ({ ...p, esPromo: true, stock_actual: 999 })))
+        }
       }
     }
     fetchData()
@@ -146,7 +171,7 @@ export default function VentasPage() {
   }
 
   const finalizarVenta = async () => {
-    if (carrito.length === 0) return
+    if (carrito.length === 0 || !kioskoId) return
 
     // Validamos que el total ingresado coincida exactamente con el carrito
     if (Math.abs(totalIngresado - totalVenta) > 0.01) {
@@ -163,9 +188,11 @@ export default function VentasPage() {
     else if (valTarjeta > 0 && valEfectivo === 0 && valTransf === 0) metodoFinal = 'tarjeta'
     else if (valTransf > 0 && valEfectivo === 0 && valTarjeta === 0) metodoFinal = 'transferencia'
 
+    // INSERTamos la venta incluyendo obligatoriamente el kiosko_id
     const { data: venta, error: errVenta } = await supabase
       .from('ventas')
       .insert([{
+        kiosko_id: kioskoId,
         total: totalVenta,
         metodo_pago: metodoFinal,
         pago_efectivo: valEfectivo,
@@ -192,12 +219,13 @@ export default function VentasPage() {
         },
       ])
 
-      // Si no es promo, consultamos y restamos el stock asegurando compatibilidad en el ID
+      // Si no es promo, consultamos y restamos el stock asegurando compatibilidad en el ID y el kiosko
       if (!item.esPromo) {
         const { data: productoActual } = await supabase
           .from('productos')
           .select('stock_actual')
           .eq('id', String(item.id))
+          .eq('kiosko_id', kioskoId)
           .single()
 
         if (productoActual) {
@@ -208,6 +236,7 @@ export default function VentasPage() {
             .from('productos')
             .update({ stock_actual: nuevoStock >= 0 ? nuevoStock : 0 })
             .eq('id', String(item.id))
+            .eq('kiosko_id', kioskoId)
 
           if (errorStock) {
             console.error('Error al actualizar stock de:', item.nombre, errorStock.message)

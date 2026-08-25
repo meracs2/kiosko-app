@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Sparkles, PackageSearch, ShoppingBag, DollarSign, Store, ArrowRight, LogOut, ShieldAlert } from 'lucide-react'
+import { Sparkles, PackageSearch, ShoppingBag, DollarSign, Store, ArrowRight, LogOut } from 'lucide-react'
 
 export default function Home() {
   const [rol, setRol] = useState<string | null>(null)
@@ -14,25 +14,32 @@ export default function Home() {
 
   useEffect(() => {
     const verificarSesionYRol = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
 
-      if (!session) {
-        router.push('/login')
-        return
-      }
+        if (!session) {
+          router.replace('/login')
+          return
+        }
 
-      const { data: perfil } = await supabase
-        .from('perfiles')
-        .select('rol')
-        .eq('id', session.user.id)
-        .single()
+        const { data: perfil, error } = await supabase
+          .from('perfiles')
+          .select('rol')
+          .eq('id', session.user.id)
+          .single()
 
-      if (perfil) {
-        setRol(perfil.rol)
-      } else {
+        if (error || !perfil) {
+          // Si no encuentra el perfil o hay error, por seguridad asignamos empleado
+          setRol('empleado')
+        } else {
+          setRol(perfil.rol)
+        }
+      } catch (err) {
+        console.error('Error al verificar sesión:', err)
         setRol('empleado')
+      } finally {
+        setCargando(false)
       }
-      setCargando(false)
     }
 
     verificarSesionYRol()
@@ -40,7 +47,7 @@ export default function Home() {
 
   const cerrarSesion = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.replace('/login')
   }
 
   if (cargando) {
@@ -54,9 +61,6 @@ export default function Home() {
   // Definimos permisos según el rol
   const esSuperAdminOrAdmin = rol === 'super_admin' || rol === 'admin'
   const puedeVerCaja = rol === 'super_admin' || rol === 'admin' || rol === 'empleado'
-  
-  // Si es empleado, la grilla se adapta mejor con 2 columnas para mostrar los 2 botones
-  const esEmpleado = rol === 'empleado'
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6 max-w-xl mx-auto flex flex-col justify-center">
@@ -88,7 +92,7 @@ export default function Home() {
             Operativo
           </div>
           <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-            Rol: {rol}
+            Rol: {rol || 'Cargando...'}
           </div>
         </div>
       </div>
