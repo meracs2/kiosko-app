@@ -17,12 +17,10 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
-        // Si no hay sesión iniciada, redirigir al login
         router.push('/login')
         return
       }
 
-      // Buscar el rol del usuario en la tabla perfiles
       const { data: perfil } = await supabase
         .from('perfiles')
         .select('rol')
@@ -32,7 +30,7 @@ export default function Home() {
       if (perfil) {
         setRol(perfil.rol)
       } else {
-        setRol('empleado') // Por seguridad por defecto
+        setRol('empleado')
       }
       setCargando(false)
     }
@@ -55,6 +53,10 @@ export default function Home() {
 
   // Definimos permisos según el rol
   const esSuperAdminOrAdmin = rol === 'super_admin' || rol === 'admin'
+  const puedeVerCaja = rol === 'super_admin' || rol === 'admin' || rol === 'empleado'
+  
+  // Si es empleado, la grilla se adapta mejor con 2 columnas para mostrar los 2 botones
+  const esEmpleado = rol === 'empleado'
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6 max-w-xl mx-auto flex flex-col justify-center">
@@ -92,7 +94,7 @@ export default function Home() {
       </div>
 
       {/* Grilla Principal adaptativa según el rol */}
-      <div className={`grid gap-4 ${esSuperAdminOrAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      <div className="grid grid-cols-2 gap-4">
         {/* Punto de Venta (Disponible para todos) */}
         <Link
           href="/ventas"
@@ -148,8 +150,8 @@ export default function Home() {
           </Link>
         )}
 
-        {/* Caja del Día (Solo Admin / Super Admin) */}
-        {esSuperAdminOrAdmin && (
+        {/* Caja del Día (Disponible para Admin y Empleados) */}
+        {puedeVerCaja && (
           <Link
             href="/caja"
             className="group relative bg-white border border-slate-200/80 text-slate-800 p-5 rounded-3xl shadow-sm flex flex-col justify-between h-44 active:scale-95 transition-all hover:border-slate-300 hover:shadow-md"
