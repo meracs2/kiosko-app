@@ -18,6 +18,9 @@ interface Venta {
   created_at: string
   total: number
   metodo_pago: string
+  pago_efectivo?: number
+  pago_tarjeta?: number
+  pago_transferencia?: number
   detalle_ventas?: DetalleVenta[]
 }
 
@@ -47,7 +50,6 @@ export default function CajaPage() {
 
   useEffect(() => {
     fetchVentas()
-    // Recuperamos el último cierre guardado del dispositivo
     const cierreGuardado = localStorage.getItem('kiosko_ultimo_cierre')
     if (cierreGuardado) {
       setUltimoCierre(Number(cierreGuardado))
@@ -60,35 +62,34 @@ export default function CajaPage() {
     return fechaVentaMs > ultimoCierre
   })
 
-  // Totales registrados por el sistema para este turno
-  const sisEfectivo = ventasDelTurno
-    .filter((v) => v.metodo_pago === 'efectivo')
-    .reduce((acc, v) => acc + Number(v.total), 0)
-
-  const sisTarjeta = ventasDelTurno
-    .filter((v) => v.metodo_pago === 'tarjeta')
-    .reduce((acc, v) => acc + Number(v.total), 0)
-
-  const sisTransf = ventasDelTurno
-    .filter((v) => v.metodo_pago === 'transferencia')
-    .reduce((acc, v) => acc + Number(v.total), 0)
+  // Totales del sistema considerando pagos mixtos individuales
+  const sisEfectivo = ventasDelTurno.reduce(
+    (acc, v) => acc + Number(v.pago_efectivo ?? (v.metodo_pago === 'efectivo' ? v.total : 0)),
+    0
+  )
+  const sisTarjeta = ventasDelTurno.reduce(
+    (acc, v) => acc + Number(v.pago_tarjeta ?? (v.metodo_pago === 'tarjeta' ? v.total : 0)),
+    0
+  )
+  const sisTransf = ventasDelTurno.reduce(
+    (acc, v) => acc + Number(v.pago_transferencia ?? (v.metodo_pago === 'transferencia' ? v.total : 0)),
+    0
+  )
 
   const sisTotal = sisEfectivo + sisTarjeta + sisTransf
 
-  // Totales ingresados manualmente
+  // Totales ingresados manualmente en el arqueo físico
   const valEfectivo = parseFloat(manualEfectivo) || 0
   const valTarjeta = parseFloat(manualTarjeta) || 0
   const valTransf = parseFloat(manualTransf) || 0
   const totalManual = valEfectivo + valTarjeta + valTransf
 
-  // Diferencia
   const diferencia = totalManual - sisTotal
 
   const toggleExpandir = (id: string) => {
     setVentaExpandida(ventaExpandida === id ? null : id)
   }
 
-  // Función para realizar el cierre de caja y reiniciar los contadores
   const handleCierreCaja = () => {
     const confirmar = window.confirm(
       '¿Estás seguro de realizar el Cierre de Caja? Esto pondrá los contadores en $0 para el nuevo turno. (Asegurate de sacar captura de pantalla antes).'
@@ -99,7 +100,6 @@ export default function CajaPage() {
     localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
     setUltimoCierre(ahoraMs)
 
-    // Limpiamos los inputs manuales
     setManualEfectivo('')
     setManualTarjeta('')
     setManualTransf('')
@@ -222,11 +222,7 @@ export default function CajaPage() {
               }`}
             >
               <div className="flex items-center gap-1.5">
-                {diferencia === 0 ? (
-                  <CheckCircle2 size={16} />
-                ) : (
-                  <AlertTriangle size={16} />
-                )}
+                {diferencia === 0 ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
                 <span>
                   {diferencia === 0
                     ? 'Caja cuadrada perfectamente'
@@ -252,7 +248,7 @@ export default function CajaPage() {
         </button>
       </div>
 
-      {/* Historial de Ventas del Turno con Detalle */}
+      {/* Historial de Ventas del Turno con Detalle y Pagos Mixtos */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center gap-2 text-sm">
           <Calendar size={18} />
@@ -276,17 +272,23 @@ export default function CajaPage() {
                         <p className="font-bold text-gray-800 text-sm">
                           ${Number(v.total).toLocaleString()}
                         </p>
-                        <span
-                          className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-                            v.metodo_pago === 'efectivo'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : v.metodo_pago === 'tarjeta'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
-                          }`}
-                        >
-                          {v.metodo_pago}
-                        </span>
+                        {v.metodo_pago === 'mixto' ? (
+                          <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-semibold">
+                            Mixto (Ef: ${v.pago_efectivo || 0} | Tarj: ${v.pago_tarjeta || 0} | Tr: ${v.pago_transferencia || 0})
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                              v.metodo_pago === 'efectivo'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : v.metodo_pago === 'tarjeta'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-purple-100 text-purple-700'
+                            }`}
+                          >
+                            {v.metodo_pago}
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs text-gray-400">
                         {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({v.detalle_ventas?.length || 0} ítems)
