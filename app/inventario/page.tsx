@@ -31,7 +31,7 @@ export default function InventarioPage() {
   const [mensaje, setMensaje] = useState('')
 
   const fetchProductos = async () => {
-    const { data } = await supabase.from('productos').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('productos').select('*').order('id', { ascending: false })
     if (data) setProductos(data)
   }
 
