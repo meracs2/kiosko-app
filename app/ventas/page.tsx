@@ -192,9 +192,9 @@ export default function VentasPage() {
         },
       ])
 
-      // Si no es una promo, buscamos el stock real en la base de datos y lo restamos con seguridad
+      // Si no es promo, consultamos y restamos el stock directamente de la base de datos
       if (!item.esPromo) {
-        const { data: productoActual } = await supabase
+        const { data: productoActual, error: errBusqueda } = await supabase
           .from('productos')
           .select('stock_actual')
           .eq('id', item.id)
@@ -204,10 +204,16 @@ export default function VentasPage() {
           const stockActualEnDB = productoActual.stock_actual ?? 0
           const nuevoStock = stockActualEnDB - item.cantidad
 
-          await supabase
+          const { error: errorStock } = await supabase
             .from('productos')
             .update({ stock_actual: nuevoStock >= 0 ? nuevoStock : 0 })
             .eq('id', item.id)
+
+          if (errorStock) {
+            console.error('Error al actualizar stock de:', item.nombre, errorStock.message)
+          }
+        } else {
+          console.error('No se encontró el producto en la DB con ID:', item.id, errBusqueda)
         }
       }
     }
