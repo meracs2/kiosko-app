@@ -108,11 +108,63 @@ export default function CajaPage() {
     setVentaExpandida(ventaExpandida === id ? null : id)
   }
 
+  // Función para generar y descargar el reporte localmente compatible con Excel
+  const descargarReporteExcelLocal = () => {
+    const fechaHoraActual = new Date().toLocaleString()
+    
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // \uFEFF asegura soporte para tildes y caracteres latinos
+    
+    csvContent += "REPORTE DE CIERRE DE TURNO - KIOSKO POS\n";
+    csvContent += `Fecha y Hora de Cierre:, "${fechaHoraActual}"\n\n`;
+    
+    csvContent += "RESUMEN DEL SISTEMA\n";
+    csvContent += `Total General,$${sisTotal}\n`;
+    csvContent += `Efectivo Sistema,$${sisEfectivo}\n`;
+    csvContent += `Tarjeta Sistema,$${sisTarjeta}\n`;
+    csvContent += `Transferencia Sistema,$${sisTransf}\n\n`;
+
+    csvContent += "ARQUEO MANUAL / FISICO\n";
+    csvContent += `Efectivo en Caja,$${valEfectivo}\n`;
+    csvContent += `Total Tarjeta,$${valTarjeta}\n`;
+    csvContent += `Total Transferencias,$${valTransf}\n`;
+    csvContent += `Total Ingresado,$${totalManual}\n`;
+    csvContent += `Diferencia (Sobrante/Faltante),$${diferencia}\n\n`;
+
+    csvContent += "DETALLE DE VENTAS DEL TURNO\n";
+    csvContent += "ID Venta,Fecha y Hora,Método,Efectivo,Tarjeta,Transferencia,Total,Detalle Ítems\n";
+
+    ventasDelTurno.forEach((v) => {
+      const fechaVenta = new Date(v.created_at).toLocaleString();
+      const detalleTexto = v.detalle_ventas 
+        ? v.detalle_ventas.map(i => `${i.cantidad}x ${i.nombre_producto}`).join(' | ') 
+        : 'Sin detalle';
+      
+      csvContent += `"${v.id}","${fechaVenta}","${v.metodo_pago}",$${v.pago_efectivo || 0},$${v.pago_tarjeta || 0},$${v.pago_transferencia || 0},$${v.total},"${detalleTexto}"\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    const nombreArchivo = `Cierre_Turno_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.setAttribute("download", nombreArchivo);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   const handleCierreCaja = () => {
+    if (ventasDelTurno.length === 0) {
+      alert('No hay ventas registradas en este turno para cerrar.')
+      return
+    }
+
     const confirmar = window.confirm(
-      '¿Estás seguro de realizar el Cierre de Caja? Esto pondrá los contadores en $0 para el nuevo turno. (Asegurate de sacar captura de pantalla antes).'
+      '¿Estás seguro de realizar el Cierre de Caja? Esto guardará un archivo Excel en tu dispositivo y pondrá los contadores en $0 para el nuevo turno.'
     )
     if (!confirmar) return
+
+    // Generamos y descargamos el archivo localmente
+    descargarReporteExcelLocal()
 
     const ahoraMs = Date.now()
     localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
@@ -122,7 +174,7 @@ export default function CajaPage() {
     setManualTarjeta('')
     setManualTransf('')
 
-    alert('¡Caja cerrada y reiniciada con éxito!')
+    alert('¡Caja cerrada, archivo Excel descargado y contadores reiniciados con éxito!')
   }
 
   return (
