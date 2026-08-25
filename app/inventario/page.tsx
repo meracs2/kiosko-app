@@ -396,7 +396,7 @@ export default function InventarioPage() {
           <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
         </div>
 
-        {/* Botones de Filtro Rápido (Limpio, sin notificaciones feas) */}
+        {/* Botones de Filtro Rápido (Sin botón de stock bajo) */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 text-xs">
           <button
             onClick={() => setFiltroCategoria('todos')}
@@ -405,14 +405,6 @@ export default function InventarioPage() {
             }`}
           >
             Todos
-          </button>
-          <button
-            onClick={() => setFiltroCategoria('bajo')}
-            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
-              filtroCategoria === 'bajo' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-            }`}
-          >
-            Stock Bajo (≤ 5)
           </button>
           <button
             onClick={() => setFiltroCategoria('coca')}
