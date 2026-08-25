@@ -32,13 +32,11 @@ export default function VentasPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Cargar productos
       const { data: prods } = await supabase.from('productos').select('*')
       if (prods) {
         setProductos(prods.map(p => ({ ...p, esPromo: false })))
       }
 
-      // Cargar promociones
       const { data: promos } = await supabase.from('promociones').select('*')
       if (promos) {
         setPromociones(promos.map(p => ({ ...p, esPromo: true, stock_actual: 999 })))
@@ -47,10 +45,8 @@ export default function VentasPage() {
     fetchData()
   }, [])
 
-  // Combinar todo el inventario disponible
   const inventarioTotal = [...productos, ...promociones]
 
-  // Agregar al carrito
   const agregarAlCarrito = (item: ItemInventario) => {
     setCarrito((prev) => {
       const existe = prev.find((i) => i.id === item.id && i.esPromo === item.esPromo)
@@ -91,21 +87,23 @@ export default function VentasPage() {
     const textoLimpio = texto.trim()
     if (!textoLimpio) return
 
-    // Buscar por código de barras exacto
+    // 1. Buscar por coincidencia exacta de código de barras o QR
     const itemPorCodigo = inventarioTotal.find((p) => p.codigo_barras === textoLimpio)
     if (itemPorCodigo) {
       agregarAlCarrito(itemPorCodigo)
       return
     }
 
-    // Coincidencia exacta por nombre
+    // 2. Si hay coincidencias parciales por nombre o número, tomar el primer resultado
     const coincidencias = inventarioTotal.filter((p) =>
-      p.nombre.toLowerCase().includes(textoLimpio.toLowerCase())
+      p.nombre.toLowerCase().includes(textoLimpio.toLowerCase()) ||
+      (p.codigo_barras && p.codigo_barras.includes(textoLimpio))
     )
-    if (coincidencias.length === 1) {
+
+    if (coincidencias.length > 0) {
       agregarAlCarrito(coincidencias[0])
-    } else if (coincidencias.length === 0) {
-      setMensaje('Artículo no encontrado en inventario o promociones')
+    } else {
+      setMensaje('Artículo no encontrado')
     }
   }
 
@@ -120,10 +118,11 @@ export default function VentasPage() {
     setMostrarEscaner(false)
   }
 
-  // Sugerencias combinadas en tiempo real
-  const itemsSugeridos = busqueda.trim() === '' ? [] : inventarioTotal.filter((p) =>
-    p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (p.codigo_barras && p.codigo_barras.includes(busqueda))
+  // Sugerencias abiertas: busca tanto por nombre como por número de código/QR si tiene al menos 1 caracter
+  const textoTrim = busqueda.trim()
+  const itemsSugeridos = textoTrim.length === 0 ? [] : inventarioTotal.filter((p) =>
+    p.nombre.toLowerCase().includes(textoTrim.toLowerCase()) ||
+    (p.codigo_barras && p.codigo_barras.includes(textoTrim))
   )
 
   const totalVenta = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0)
@@ -156,7 +155,6 @@ export default function VentasPage() {
         },
       ])
 
-      // Descontar stock solo si es producto real
       if (!item.esPromo && item.stock_actual !== undefined) {
         const nuevoStock = item.stock_actual - item.cantidad
         await supabase
@@ -200,10 +198,10 @@ export default function VentasPage() {
         </div>
       )}
 
-      {/* Barra de búsqueda unificada (Productos y Promos) */}
+      {/* Barra de búsqueda unificada (Texto, Código de Barras o QR) */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-4 relative">
         <label className="block text-xs font-semibold text-gray-600 mb-1">
-          Buscar Producto o Promoción
+          Buscar por Nombre, Código de Barras o QR
         </label>
         <div className="flex gap-2 relative">
           <div className="relative w-full">
@@ -212,7 +210,7 @@ export default function VentasPage() {
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && manejarBusquedaOEnter(busqueda)}
-              placeholder="Tipeá producto, promo o código..."
+              placeholder="Escaneá, tipeá código/QR o buscá por nombre..."
               className="w-full pl-9 pr-3 py-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <Search size={16} className="absolute left-3 top-3 text-gray-400" />
@@ -243,7 +241,7 @@ export default function VentasPage() {
                       {item.esPromo ? `[PROMO] ${item.nombre}` : item.nombre}
                     </p>
                     <p className="text-gray-400">
-                      {item.esPromo ? 'Combo / Oferta' : `Stock: ${item.stock_actual} un.`}
+                      {item.esPromo ? 'Combo / Oferta' : `Stock: ${item.stock_actual} un. | Cód: ${item.codigo_barras || 'Sin código'}`}
                     </p>
                   </div>
                 </div>
