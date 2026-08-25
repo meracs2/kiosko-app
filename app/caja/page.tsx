@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 
 interface DetalleVenta {
   id: string
@@ -26,6 +26,9 @@ export default function CajaPage() {
   const [cargando, setCargando] = useState(true)
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null)
 
+  // Fecha del último cierre guardada en el navegador (en milisegundos)
+  const [ultimoCierre, setUltimoCierre] = useState<number>(0)
+
   // Estados para el ingreso manual de arqueo
   const [manualEfectivo, setManualEfectivo] = useState('')
   const [manualTarjeta, setManualTarjeta] = useState('')
@@ -33,7 +36,6 @@ export default function CajaPage() {
 
   const fetchVentas = async () => {
     setCargando(true)
-    // Consultamos la venta y traemos sus ítems relacionados de detalle_ventas
     const { data } = await supabase
       .from('ventas')
       .select('*, detalle_ventas(*)')
@@ -45,18 +47,29 @@ export default function CajaPage() {
 
   useEffect(() => {
     fetchVentas()
+    // Recuperamos el último cierre guardado del dispositivo
+    const cierreGuardado = localStorage.getItem('kiosko_ultimo_cierre')
+    if (cierreGuardado) {
+      setUltimoCierre(Number(cierreGuardado))
+    }
   }, [])
 
-  // Totales registrados por el sistema
-  const sisEfectivo = ventas
+  // Filtramos las ventas ocurridas DESPUÉS del último cierre de caja
+  const ventasDelTurno = ventas.filter((v) => {
+    const fechaVentaMs = new Date(v.created_at).getTime()
+    return fechaVentaMs > ultimoCierre
+  })
+
+  // Totales registrados por el sistema para este turno
+  const sisEfectivo = ventasDelTurno
     .filter((v) => v.metodo_pago === 'efectivo')
     .reduce((acc, v) => acc + Number(v.total), 0)
 
-  const sisTarjeta = ventas
+  const sisTarjeta = ventasDelTurno
     .filter((v) => v.metodo_pago === 'tarjeta')
     .reduce((acc, v) => acc + Number(v.total), 0)
 
-  const sisTransf = ventas
+  const sisTransf = ventasDelTurno
     .filter((v) => v.metodo_pago === 'transferencia')
     .reduce((acc, v) => acc + Number(v.total), 0)
 
@@ -68,11 +81,30 @@ export default function CajaPage() {
   const valTransf = parseFloat(manualTransf) || 0
   const totalManual = valEfectivo + valTarjeta + valTransf
 
-  // Diferencia (Positivo: sobrante / Negativo: faltante)
+  // Diferencia
   const diferencia = totalManual - sisTotal
 
   const toggleExpandir = (id: string) => {
     setVentaExpandida(ventaExpandida === id ? null : id)
+  }
+
+  // Función para realizar el cierre de caja y reiniciar los contadores
+  const handleCierreCaja = () => {
+    const confirmar = window.confirm(
+      '¿Estás seguro de realizar el Cierre de Caja? Esto pondrá los contadores en $0 para el nuevo turno. (Asegurate de sacar captura de pantalla antes).'
+    )
+    if (!confirmar) return
+
+    const ahoraMs = Date.now()
+    localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
+    setUltimoCierre(ahoraMs)
+
+    // Limpiamos los inputs manuales
+    setManualEfectivo('')
+    setManualTarjeta('')
+    setManualTransf('')
+
+    alert('¡Caja cerrada y reiniciada con éxito!')
   }
 
   return (
@@ -88,7 +120,7 @@ export default function CajaPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 leading-tight">Caja Diaria</h1>
-            <p className="text-xs text-gray-500">Resumen de ventas y cierre del día</p>
+            <p className="text-xs text-gray-500">Resumen de ventas y cierre de turno</p>
           </div>
         </div>
 
@@ -103,7 +135,7 @@ export default function CajaPage() {
       {/* Resumen del Sistema */}
       <div className="bg-gray-900 text-white p-5 rounded-2xl shadow-md mb-6">
         <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">
-          Total del Sistema (Ventas Registradas)
+          Total del Turno Actual
         </div>
         <div className="text-3xl font-extrabold text-green-400">
           ${sisTotal.toLocaleString()}
@@ -209,20 +241,29 @@ export default function CajaPage() {
             </div>
           </div>
         )}
+
+        {/* Botón de Cierre de Turno */}
+        <button
+          onClick={handleCierreCaja}
+          className="w-full mt-5 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
+        >
+          <Lock size={16} />
+          Cerrar Turno y Reiniciar Caja
+        </button>
       </div>
 
-      {/* Historial de Ventas Registradas con Detalle */}
+      {/* Historial de Ventas del Turno con Detalle */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center gap-2 text-sm">
           <Calendar size={18} />
-          Últimas Ventas Registradas (Tocá para ver detalle)
+          Ventas de este Turno ({ventasDelTurno.length})
         </h2>
 
-        {ventas.length === 0 ? (
-          <p className="text-center text-gray-400 py-6 text-sm">No hay ventas registradas.</p>
+        {ventasDelTurno.length === 0 ? (
+          <p className="text-center text-gray-400 py-6 text-sm">No hay ventas registradas en este turno.</p>
         ) : (
           <div className="divide-y max-h-80 overflow-y-auto">
-            {ventas.map((v) => {
+            {ventasDelTurno.map((v) => {
               const estaExpandida = ventaExpandida === v.id
               return (
                 <div key={v.id} className="py-2.5">
