@@ -4,18 +4,27 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+
+interface DetalleVenta {
+  id: string
+  nombre_producto: string
+  cantidad: number
+  precio_unitario: number
+}
 
 interface Venta {
   id: string
   created_at: string
   total: number
   metodo_pago: string
+  detalle_ventas?: DetalleVenta[]
 }
 
 export default function CajaPage() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [cargando, setCargando] = useState(true)
+  const [ventaExpandida, setVentaExpandida] = useState<string | null>(null)
 
   // Estados para el ingreso manual de arqueo
   const [manualEfectivo, setManualEfectivo] = useState('')
@@ -24,9 +33,10 @@ export default function CajaPage() {
 
   const fetchVentas = async () => {
     setCargando(true)
+    // Consultamos la venta y traemos sus ítems relacionados de detalle_ventas
     const { data } = await supabase
       .from('ventas')
-      .select('*')
+      .select('*, detalle_ventas(*)')
       .order('created_at', { ascending: false })
 
     if (data) setVentas(data)
@@ -61,6 +71,10 @@ export default function CajaPage() {
   // Diferencia (Positivo: sobrante / Negativo: faltante)
   const diferencia = totalManual - sisTotal
 
+  const toggleExpandir = (id: string) => {
+    setVentaExpandida(ventaExpandida === id ? null : id)
+  }
+
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
       {/* Header Integrado */}
@@ -73,8 +87,8 @@ export default function CajaPage() {
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 leading-tight">Caja y Arqueo</h1>
-            <p className="text-xs text-gray-500">Conteo manual y conciliación</p>
+            <h1 className="text-2xl font-bold text-gray-800 leading-tight">Caja Diaria</h1>
+            <p className="text-xs text-gray-500">Resumen de ventas y cierre del día</p>
           </div>
         </div>
 
@@ -197,40 +211,69 @@ export default function CajaPage() {
         )}
       </div>
 
-      {/* Historial de Ventas Registradas */}
+      {/* Historial de Ventas Registradas con Detalle */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center gap-2 text-sm">
           <Calendar size={18} />
-          Últimas Ventas Registradas
+          Últimas Ventas Registradas (Tocá para ver detalle)
         </h2>
 
         {ventas.length === 0 ? (
           <p className="text-center text-gray-400 py-6 text-sm">No hay ventas registradas.</p>
         ) : (
-          <div className="divide-y max-h-60 overflow-y-auto">
-            {ventas.map((v) => (
-              <div key={v.id} className="py-2.5 flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-gray-800 text-sm">
-                    ${Number(v.total).toLocaleString()}
-                  </p>
-                  <span
-                    className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-                      v.metodo_pago === 'efectivo'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : v.metodo_pago === 'tarjeta'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-purple-100 text-purple-700'
-                    }`}
+          <div className="divide-y max-h-80 overflow-y-auto">
+            {ventas.map((v) => {
+              const estaExpandida = ventaExpandida === v.id
+              return (
+                <div key={v.id} className="py-2.5">
+                  <button
+                    onClick={() => toggleExpandir(v.id)}
+                    className="w-full flex justify-between items-center text-left focus:outline-none"
                   >
-                    {v.metodo_pago}
-                  </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-gray-800 text-sm">
+                          ${Number(v.total).toLocaleString()}
+                        </p>
+                        <span
+                          className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                            v.metodo_pago === 'efectivo'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : v.metodo_pago === 'tarjeta'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}
+                        >
+                          {v.metodo_pago}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({v.detalle_ventas?.length || 0} ítems)
+                      </span>
+                    </div>
+
+                    <div className="text-gray-400">
+                      {estaExpandida ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </div>
+                  </button>
+
+                  {estaExpandida && v.detalle_ventas && (
+                    <div className="mt-2 pl-3 border-l-2 border-blue-500 bg-gray-50 p-2.5 rounded-r-lg space-y-1">
+                      {v.detalle_ventas.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center text-xs">
+                          <span className="text-gray-700 font-medium">
+                            {item.cantidad}x {item.nombre_producto}
+                          </span>
+                          <span className="text-gray-500 font-semibold">
+                            ${(item.precio_unitario * item.cantidad).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className="text-xs text-gray-400">
-                  {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
