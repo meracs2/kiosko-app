@@ -135,7 +135,7 @@ export default function VentasPage() {
   const valTransf = parseFloat(pagoTransf) || 0
   const totalIngresado = valEfectivo + valTarjeta + valTransf
 
-  // Funciones de autopago rápido (si quieren cobrar todo con un solo medio haciendo clic en un botón)
+  // Funciones de autopago rápido
   const pagarTodoCon = (tipo: 'efectivo' | 'tarjeta' | 'transferencia') => {
     setPagoEfectivo('')
     setPagoTarjeta('')
@@ -192,17 +192,28 @@ export default function VentasPage() {
         },
       ])
 
-      if (!item.esPromo && item.stock_actual !== undefined) {
-        const nuevoStock = item.stock_actual - item.cantidad
-        await supabase
+      // Si no es una promo, buscamos el stock real en la base de datos y lo restamos con seguridad
+      if (!item.esPromo) {
+        const { data: productoActual } = await supabase
           .from('productos')
-          .update({ stock_actual: nuevoStock })
+          .select('stock_actual')
           .eq('id', item.id)
+          .single()
+
+        if (productoActual) {
+          const stockActualEnDB = productoActual.stock_actual ?? 0
+          const nuevoStock = stockActualEnDB - item.cantidad
+
+          await supabase
+            .from('productos')
+            .update({ stock_actual: nuevoStock >= 0 ? nuevoStock : 0 })
+            .eq('id', item.id)
+        }
       }
     }
 
     setCargando(false)
-    setMensaje('¡Venta registrada con éxito!')
+    setMensaje('¡Venta registrada y stock actualizado con éxito!')
     setCarrito([])
     setPagoEfectivo('')
     setPagoTarjeta('')
