@@ -31,7 +31,7 @@ export default function InventarioPage() {
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
   
-  // Estado para cerrar el cartel flotante de stock bajo
+  // Estado para cerrar el cartel flotante de stock bajo superior
   const [cerrarAlertaStock, setCerrarAlertaStock] = useState(false)
 
   const fetchProductos = async () => {
@@ -170,7 +170,7 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* CARTEL FLOTANTE DE ALERTA DE STOCK BAJO (Arriba, al lado/debajo del header con botón X) */}
+      {/* CARTEL FLOTANTE DE ALERTA DE STOCK BAJO (Arriba con botón de cierre X) */}
       {cantidadStockBajo > 0 && !cerrarAlertaStock && (
         <div className="mb-4 bg-amber-50 border border-amber-300 p-3 rounded-xl shadow-sm flex items-center justify-between gap-3 transition">
           <div className="flex items-center gap-2.5">
@@ -184,10 +184,7 @@ export default function InventarioPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => {
-                setFiltroCategoria('bajo')
-                // Opcional: scrollear hacia la lista
-              }}
+              onClick={() => setFiltroCategoria('bajo')}
               className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition"
             >
               Ver
@@ -399,7 +396,7 @@ export default function InventarioPage() {
           <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
         </div>
 
-        {/* Botones de Filtro Rápido */}
+        {/* Botones de Filtro Rápido (Limpio, sin notificaciones feas) */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 text-xs">
           <button
             onClick={() => setFiltroCategoria('todos')}
@@ -411,11 +408,11 @@ export default function InventarioPage() {
           </button>
           <button
             onClick={() => setFiltroCategoria('bajo')}
-            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
               filtroCategoria === 'bajo' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            <AlertTriangle size={13} /> Stock Bajo (≤ 5)
+            Stock Bajo (≤ 5)
           </button>
           <button
             onClick={() => setFiltroCategoria('coca')}
