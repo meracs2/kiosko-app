@@ -146,7 +146,6 @@ export default function InventarioPage() {
     if (filtroCategoria === 'todos') return coincideTexto
     if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 5
     
-    // Filtro rápido por palabra clave en el nombre
     return coincideTexto && p.nombre.toLowerCase().includes(filtroCategoria)
   })
 
@@ -155,11 +154,8 @@ export default function InventarioPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="p-2.5 bg-white border shadow-sm hover:bg-gray-100 text-gray-700 rounded-xl active:scale-95 transition flex items-center justify-center shrink-0"
-          >
-            <ArrowLeft size={20} />
+          <Link className="p-2.5 bg-white border shadow-sm hover:bg-gray-100 text-gray-700 rounded-xl active:scale-95 transition flex items-center justify-center shrink-0" href="/">
+            <ArrowLeft size="{20}"/>
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 leading-tight">Inventario</h1>
@@ -186,7 +182,7 @@ export default function InventarioPage() {
             modo === 'nuevo' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'
           }`}
         >
-          <Plus size={16} /> Crear Producto Nuevo
+          <Plus size="{16}"/> Crear Producto Nuevo
         </button>
         <button
           onClick={() => { setModo('restock'); limpiarFormulario(); setMensaje(''); }}
@@ -194,7 +190,7 @@ export default function InventarioPage() {
             modo === 'restock' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600'
           }`}
         >
-          <PackagePlus size={16} /> Reponer Stock
+          <PackagePlus size="{16}"/> Reponer Stock
         </button>
       </div>
 
@@ -220,14 +216,14 @@ export default function InventarioPage() {
                   onClick={() => setMostrarEscaner(!mostrarEscaner)}
                   className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0"
                 >
-                  <Camera size={18} />
+                  <Camera size="{18}"/>
                 </button>
               </div>
             </div>
 
             {mostrarEscaner && (
               <div className="my-2">
-                <Scanner onScan={handleScan} />
+                <Scanner onScan="{handleScan}"/>
               </div>
             )}
 
@@ -274,7 +270,7 @@ export default function InventarioPage() {
               disabled={cargando}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
             >
-              <Plus size={18} />
+              <Plus size="{18}"/>
               {cargando ? 'Guardando...' : 'Guardar Producto Nuevo'}
             </button>
           </form>
@@ -307,14 +303,14 @@ export default function InventarioPage() {
                   onClick={() => setMostrarEscaner(!mostrarEscaner)}
                   className="bg-emerald-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0"
                 >
-                  <Camera size={18} />
+                  <Camera size="{18}"/>
                 </button>
               </div>
             </div>
 
             {mostrarEscaner && (
               <div className="my-2">
-                <Scanner onScan={handleScan} />
+                <Scanner onScan="{handleScan}"/>
               </div>
             )}
 
@@ -341,7 +337,7 @@ export default function InventarioPage() {
               disabled={cargando}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
             >
-              <PackagePlus size={18} />
+              <PackagePlus size="{18}"/>
               {cargando ? 'Sumando...' : 'Sumar al Stock Actual'}
             </button>
           </form>
@@ -361,11 +357,11 @@ export default function InventarioPage() {
             onChange={(e) => setBusquedaStock(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-gray-50 border rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+          <Search className="absolute left-3 top-2.5 text-gray-400" size="{16}"/>
         </div>
 
-        {/* Botones de Filtro Rápido (Categorías + Alerta de Stock Bajo) */}
-        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 text-xs scrollbar-none">
+        {/* Botones de Filtro Rápido */}
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 text-xs">
           <button
             onClick={() => setFiltroCategoria('todos')}
             className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
@@ -380,7 +376,7 @@ export default function InventarioPage() {
               filtroCategoria === 'bajo' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            <AlertTriangle size={13} /> Stock Bajo (≤ 5)
+            <AlertTriangle size="{13}"/> Stock Bajo (≤ 5)
           </button>
           <button
             onClick={() => setFiltroCategoria('coca')}
@@ -423,7 +419,7 @@ export default function InventarioPage() {
                       <p className="font-semibold text-gray-800 text-sm">{prod.nombre}</p>
                       {esStockBajo && (
                         <span className="bg-red-100 text-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shrink-0">
-                          <AlertTriangle size={11} /> ¡Quedan {prod.stock_actual}!
+                          <AlertTriangle size="{11}"/> ¡Quedan {prod.stock_actual}!
                         </span>
                       )}
                     </div>
@@ -448,12 +444,12 @@ export default function InventarioPage() {
                       onClick={() => eliminarProducto(prod.id)}
                       className="text-red-500 hover:text-red-700 p-1"
                     >
-                      <Trash2 size=```typescript {16} />
-                  </button>
+                      <Trash2 size="{16}"/>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
           </div>
         )}
       </div>
