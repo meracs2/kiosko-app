@@ -1,7 +1,7 @@
 // app/ventas/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
@@ -27,6 +27,9 @@ export default function VentasPage() {
   const [busqueda, setBusqueda] = useState('')
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
   const [kioskoId, setKioskoId] = useState<string | null>(null)
+  
+  // Referencia para abrir la cámara nativa directamente en dispositivos móviles
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Estados para montos de pago dividido
   const [pagoEfectivo, setPagoEfectivo] = useState('')
@@ -146,6 +149,14 @@ export default function VentasPage() {
     setMostrarEscaner(false)
   }
 
+  // Manejador para la captura directa con la cámara nativa del celular
+  const handleFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setMensaje('Imagen de cámara capturada correctamente.')
+    }
+  }
+
   const textoTrim = busqueda.trim()
   const itemsSugeridos = textoTrim.length === 0 ? [] : inventarioTotal.filter((p) =>
     p.nombre.toLowerCase().includes(textoTrim.toLowerCase()) ||
@@ -257,6 +268,16 @@ export default function VentasPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
+      {/* Input de archivo oculto para forzar la cámara trasera directamente en móviles */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileCapture}
+      />
+
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-3">
           <Link
@@ -304,8 +325,9 @@ export default function VentasPage() {
 
           <button
             type="button"
-            onClick={() => setMostrarEscaner(!mostrarEscaner)}
-            className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-blue-700 transition"
+            title="Abrir cámara directamente"
           >
             <Camera size={18} />
           </button>
@@ -334,12 +356,6 @@ export default function VentasPage() {
                 <span className="font-extrabold text-green-600 text-sm">${item.precio}</span>
               </button>
             ))}
-          </div>
-        )}
-
-        {mostrarEscaner && (
-          <div className="mt-3">
-            <Scanner onScan={handleScan} />
           </div>
         )}
       </div>
