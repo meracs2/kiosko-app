@@ -289,7 +289,7 @@ export default function VentasPage() {
                     onClick={() => eliminarDelCarrito(item.id)}
                     className="w-7 h-7 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg flex items-center justify-center ml-1 active:scale-95 transition"
                   >
-                    <X size5={14} size={14} />
+                    <X size={14} />
                   </button>
                 </div>
 
