@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus } from 'lucide-react'
+import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus, AlertTriangle } from 'lucide-react'
 
 interface Producto {
   id: string
@@ -26,6 +26,7 @@ export default function InventarioPage() {
   const [stock, setStock] = useState('')
   
   const [busquedaStock, setBusquedaStock] = useState('')
+  const [filtroCategoria, setFiltroCategoria] = useState('todos')
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
@@ -136,14 +137,22 @@ export default function InventarioPage() {
     }
   }
 
-  const productosFiltrados = productos.filter((p) =>
-    p.nombre.toLowerCase().includes(busquedaStock.toLowerCase()) ||
-    p.codigo_barras.includes(busquedaStock)
-  )
+  // Filtrado por buscador y por botones rápidos de categoría
+  const productosFiltrados = productos.filter((p) => {
+    const coincideTexto =
+      p.nombre.toLowerCase().includes(busquedaStock.toLowerCase()) ||
+      p.codigo_barras.includes(busquedaStock)
+
+    if (filtroCategoria === 'todos') return coincideTexto
+    if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 5
+    
+    // Filtro rápido por palabra clave en el nombre
+    return coincideTexto && p.nombre.toLowerCase().includes(filtroCategoria)
+  })
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Header sin el botón de cobrar */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <Link
@@ -339,10 +348,11 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* Lista de Productos con Buscador */}
+      {/* Lista de Productos con Buscador y Filtros Rápidos */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Lista de Stock Actual</h2>
 
+        {/* Buscador de texto */}
         <div className="relative mb-3">
           <input
             type="text"
@@ -354,40 +364,96 @@ export default function InventarioPage() {
           <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
         </div>
 
+        {/* Botones de Filtro Rápido (Categorías + Alerta de Stock Bajo) */}
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 text-xs scrollbar-none">
+          <button
+            onClick={() => setFiltroCategoria('todos')}
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
+              filtroCategoria === 'todos' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Todos
+          </button>
+          <button
+            onClick={() => setFiltroCategoria('bajo')}
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition flex items-center gap-1 ${
+              filtroCategoria === 'bajo' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <AlertTriangle size={13} /> Stock Bajo (≤ 5)
+          </button>
+          <button
+            onClick={() => setFiltroCategoria('coca')}
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
+              filtroCategoria === 'coca' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Bebidas
+          </button>
+          <button
+            onClick={() => setFiltroCategoria('galletitas')}
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
+              filtroCategoria === 'galletitas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Galletitas
+          </button>
+          <button
+            onClick={() => setFiltroCategoria('limpieza')}
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
+              filtroCategoria === 'limpieza' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Limpieza
+          </button>
+        </div>
+
         {productosFiltrados.length === 0 ? (
           <p className="text-center text-gray-400 py-4 text-sm">
-            {busquedaStock ? 'No se encontraron productos.' : 'No hay productos cargados.'}
+            {busquedaStock || filtroCategoria !== 'todos' ? 'No se encontraron productos con ese filtro.' : 'No hay productos cargados.'}
           </p>
         ) : (
           <div className="divide-y max-h-80 overflow-y-auto">
-            {productosFiltrados.map((prod) => (
-              <div key={prod.id} className="py-3 flex justify-between items-center">
-                <div>
-                  <p className="font-semibold text-gray-800 text-sm">{prod.nombre}</p>
-                  <p className="text-xs text-gray-400">Cód: {prod.codigo_barras}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded font-bold">
-                      Stock: {prod.stock_actual} un.
-                    </span>
-                    <button
-                      onClick={() => sumarUnidadesDirecto(prod)}
-                      className="text-xs text-emerald-600 font-bold hover:underline"
-                    >
-                      + Sumar rápidas
-                    </button>
+            {productosFiltrados.map((prod) => {
+              const esStockBajo = prod.stock_actual <= 5
+              return (
+                <div key={prod.id} className="py-3 flex justify-between items-center">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-800 text-sm">{prod.nombre}</p>
+                      {esStockBajo && (
+                        <span className="bg-red-100 text-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shrink-0">
+                          <AlertTriangle size={11} /> ¡Quedan {prod.stock_actual}!
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400">Cód: {prod.codigo_barras}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded font-bold ${
+                        esStockBajo ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        Stock: {prod.stock_actual} un.
+                      </span>
+                      <button
+                        onClick={() => sumarUnidadesDirecto(prod)}
+                        className="text-xs text-emerald-600 font-bold hover:underline"
+                      >
+                        + Sumar rápidas
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-green-600 text-sm">${prod.precio}</span>
-                  <button
-                    onClick={() => eliminarProducto(prod.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                  >
-                    <Trash2 size={16} />
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-green-600 text-sm">${prod.precio}</span>
+                    <button
+                      onClick={() => eliminarProducto(prod.id)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                    >
+                      <Trash2 size=```typescript {16} />
                   </button>
                 </div>
               </div>
-            ))}
+            )
+          })}
           </div>
         )}
       </div>
