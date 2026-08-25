@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏪 Kiosko POS
 
-## Getting Started
+Sistema de gestión de inventario, punto de venta y promociones diseñado para la administración rápida e intuitiva de un kiosco o comercio de cercanía.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🚀 Características Principales
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+* **🛒 Punto de Venta (POS):** Módulo ágil para registrar ventas, calcular totales y emitir tickets.
+* **📦 Control de Inventario:** Gestión de stock en tiempo real con alertas de faltantes.
+* **🏷️ Gestión de Promociones:** Creación de combos personalizados (ofertas, combos de bebidas, etc.).
+* **💰 Caja del Día:** Registro de ingresos, cierres de caja y reporte de totales diarios.
+* **📱 PWA (Progressive Web App):** Instalable en teléfonos móviles y PC como una app nativa.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠️ Tecnologías Utilizadas
 
-## Learn More
+* **Framework:** [Next.js 15](https://nextjs.org/) (App Router)
+* **Lenguaje:** TypeScript
+* **Estilos:** Tailwind CSS
+* **Iconos:** Lucide React
+* **Base de Datos:** Supabase (PostgreSQL)
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 💻 Instalación y Configuración Local
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Clonar el repositorio:**
+   ```bash
+   git clone [https://github.com/meracs2/kiosko-app.git](https://github.com/meracs2/kiosko-app.git)
+   cd kiosko-app
+   📦 Despliegue en Vercel
+Este proyecto está optimizado para desplegarse fácilmente en Vercel:
 
-## Deploy on Vercel
+Conectá tu cuenta de GitHub con Vercel.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Importá el repositorio kiosko-app.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Configurá las variables de entorno de Supabase en Vercel (NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY).
+
+¡Hacé el deploy!
