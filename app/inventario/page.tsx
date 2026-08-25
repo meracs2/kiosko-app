@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { Camera, Plus, Trash2, ArrowLeft, ShoppingBag, Search, PackagePlus } from 'lucide-react'
+import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus } from 'lucide-react'
 
 interface Producto {
   id: string
@@ -143,7 +143,7 @@ export default function InventarioPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Header */}
+      {/* Header sin el botón de cobrar */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <Link
@@ -157,13 +157,6 @@ export default function InventarioPage() {
             <p className="text-xs text-gray-500">Gestión y control de mercadería</p>
           </div>
         </div>
-
-        <Link
-          href="/ventas"
-          className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 active:scale-95 transition shrink-0"
-        >
-          <ShoppingBag size={16} /> Ir a Cobrar
-        </Link>
       </div>
 
       {mensaje && (
