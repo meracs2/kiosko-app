@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { ArrowLeft, Camera, Plus, Minus, X, ShoppingBag, Banknote, CreditCard, QrCode } from 'lucide-react'
+import { ArrowLeft, Camera, Plus, Minus, X, ShoppingBag, Banknote, CreditCard, QrCode, Search } from 'lucide-react'
 
 interface Producto {
   id: string
@@ -22,7 +22,7 @@ interface ItemCarrito extends Producto {
 export default function VentasPage() {
   const [productos, setProductos] = useState<Producto[]>([])
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
-  const [codigoIngresado, setCodigoIngresado] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
   const [cargando, setCargando] = useState(false)
@@ -47,6 +47,8 @@ export default function VentasPage() {
       }
       return [...prev, { ...producto, cantidad: 1 }]
     })
+    setBusqueda('')
+    setMensaje('')
   }
 
   // Modificar cantidad (+)
@@ -74,33 +76,55 @@ export default function VentasPage() {
     setCarrito((prev) => prev.filter((item) => item.id !== id))
   }
 
-  // Buscar por código tipeado o escaneado
-  const buscarYAgregar = (codigo: string) => {
-    const prod = productos.find((p) => p.codigo_barras === codigo)
-    if (prod) {
-      agregarAlCarrito(prod)
-      setCodigoIngresado('')
-      setMensaje('')
-    } else {
+  // Lógica al presionar Enter o buscar
+  const manejarBusquedaOEnter = (texto: string) => {
+    const textoLimpio = texto.trim()
+    if (!textoLimpio) return
+
+    // 1. Buscar si coincide exactamente con un código de barras
+    const prodPorCodigo = productos.find((p) => p.codigo_barras === textoLimpio)
+    if (prodPorCodigo) {
+      agregarAlCarrito(prodPorCodigo)
+      return
+    }
+
+    // 2. Si hay un único resultado exacto por nombre, agregarlo directo
+    const coincidencias = productos.filter((p) =>
+      p.nombre.toLowerCase().includes(textoLimpio.toLowerCase())
+    )
+    if (coincidencias.length === 1) {
+      agregarAlCarrito(coincidencias[0])
+    } else if (coincidencias.length === 0) {
       setMensaje('Producto no encontrado en inventario')
     }
   }
 
   const handleScan = (codigo: string) => {
-    buscarYAgregar(codigo)
+    const prod = productos.find((p) => p.codigo_barras === codigo)
+    if (prod) {
+      agregarAlCarrito(prod)
+      setMensaje('')
+    } else {
+      setMensaje('Producto escaneado no encontrado')
+    }
     setMostrarEscaner(false)
   }
 
-  // Total acumulado de la venta actual
+  // Productos sugeridos al tipear
+  const productosSugeridos = busqueda.trim() === '' ? [] : productos.filter((p) =>
+    p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+    p.codigo_barras.includes(busqueda)
+  )
+
+  // Total acumulado
   const totalVenta = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0)
 
-  // Confirmar y cobrar la venta al cliente
+  // Finalizar venta
   const finalizarVenta = async () => {
     if (carrito.length === 0) return
     setCargando(true)
     setMensaje('')
 
-    // 1. Crear el registro general de la venta
     const { data: venta, error: errVenta } = await supabase
       .from('ventas')
       .insert([{ total: totalVenta, metodo_pago: metodoPago }])
@@ -113,7 +137,6 @@ export default function VentasPage() {
       return
     }
 
-    // 2. Guardar el detalle de los productos vendidos y descontar stock
     for (const item of carrito) {
       await supabase.from('detalle_ventas').insert([
         {
@@ -125,7 +148,6 @@ export default function VentasPage() {
         },
       ])
 
-      // Descontar del stock actual del producto
       const nuevoStock = item.stock_actual - item.cantidad
       await supabase
         .from('productos')
@@ -140,7 +162,7 @@ export default function VentasPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Header Integrado */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-3">
           <Link
@@ -168,20 +190,24 @@ export default function VentasPage() {
         </div>
       )}
 
-      {/* Buscador y Lector de Cámara */}
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
+      {/* Barra Única Inteligente (Código de barras o Nombre) */}
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 relative">
         <label className="block text-xs font-semibold text-gray-600 mb-1">
-          Escanear o Tipear Código
+          Buscar por Nombre o Código de Barras
         </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={codigoIngresado}
-            onChange={(e) => setCodigoIngresado(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && buscarYAgregar(codigoIngresado)}
-            placeholder="Ej: 779123456"
-            className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
-          />
+        <div className="flex gap-2 relative">
+          <div className="relative w-full">
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && manejarBusquedaOEnter(busqueda)}
+              placeholder="Escaneá, tipeá código o buscá por nombre..."
+              className="w-full pl-9 pr-3 py-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+          </div>
+
           <button
             type="button"
             onClick={() => setMostrarEscaner(!mostrarEscaner)}
@@ -191,6 +217,26 @@ export default function VentasPage() {
           </button>
         </div>
 
+        {/* Sugerencias en tiempo real */}
+        {productosSugeridos.length > 0 && (
+          <div className="absolute left-4 right-4 z-10 mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y">
+            {productosSugeridos.map((prod) => (
+              <button
+                key={prod.id}
+                type="button"
+                onClick={() => agregarAlCarrito(prod)}
+                className="w-full p-2.5 text-left hover:bg-blue-50 flex justify-between items-center text-xs transition"
+              >
+                <div>
+                  <p className="font-bold text-gray-800">{prod.nombre}</p>
+                  <p className="text-gray-400">Stock: {prod.stock_actual} un. | Cód: {prod.codigo_barras}</p>
+                </div>
+                <span className="font-extrabold text-green-600 text-sm">${prod.precio}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {mostrarEscaner && (
           <div className="mt-3">
             <Scanner onScan={handleScan} />
@@ -198,7 +244,7 @@ export default function VentasPage() {
         )}
       </div>
 
-      {/* Detalle del Carrito de la Venta actual (Control con botones +, - y X) */}
+      {/* Detalle del Carrito */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
         <div className="flex justify-between items-center border-b pb-2 mb-3">
           <h2 className="font-bold text-gray-700 text-sm flex items-center gap-2">
@@ -210,7 +256,7 @@ export default function VentasPage() {
         </div>
 
         {carrito.length === 0 ? (
-          <p className="text-center text-gray-400 py-6 text-sm">Escaneá o buscá productos para armar el pedido.</p>
+          <p className="text-center text-gray-400 py-6 text-sm">Buscá o escaneá productos para armar el pedido.</p>
         ) : (
           <div className="divide-y max-h-64 overflow-y-auto">
             {carrito.map((item) => (
@@ -220,7 +266,6 @@ export default function VentasPage() {
                   <p className="text-xs text-gray-400">${item.precio} c/u</p>
                 </div>
 
-                {/* Botones de Control (+ , - y X) */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => decrementarCantidad(item.id)}
@@ -244,7 +289,7 @@ export default function VentasPage() {
                     onClick={() => eliminarDelCarrito(item.id)}
                     className="w-7 h-7 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg flex items-center justify-center ml-1 active:scale-95 transition"
                   >
-                    <X size={14} />
+                    <X size5={14} size={14} />
                   </button>
                 </div>
 
