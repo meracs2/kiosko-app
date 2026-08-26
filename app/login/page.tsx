@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Lock, Mail, Store, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Lock, Mail, Store, Sparkles, HeartHandshake } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -48,41 +48,43 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl overflow-hidden w-full max-w-md border border-slate-100 transition-all">
+    <main className="min-h-screen bg-amber-50/60 flex items-center justify-center p-4 selection:bg-orange-200">
+      <div className="bg-white rounded-[2.5rem] shadow-xl shadow-orange-950/5 overflow-hidden w-full max-w-md border border-orange-100 transition-all">
         
-        {/* HERO HEADER CON ILUSTRACIÓN DE UNSPASH */}
-        <div className="relative h-44 bg-gradient-to-br from-blue-600 to-indigo-700 p-6 flex flex-col justify-end text-white overflow-hidden">
-          <img 
-            src="https://images.unsplash.com/photo-1556742049-0a67daf4005a?auto=format&fit=crop&q=80&w=800" 
-            alt="Punto de Venta Kiosko"
-            className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay"
-          />
-          <div className="absolute top-4 left-4 bg-white/20 backdrop-blur-md p-2 rounded-2xl border border-white/20">
-            <Store size={24} className="text-white" />
+        {/* CABECERA CÁLIDA Y AMIGABLE */}
+        <div className="relative pt-10 pb-8 px-6 bg-gradient-to-b from-orange-100/70 via-amber-50/40 to-white text-center flex flex-col items-center">
+          
+          {/* ÍCONO / LOGO EN CIRCULO FLOTANTE CÁLIDO */}
+          <div className="relative mb-3">
+            <div className="w-20 h-20 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-3xl rotate-3 flex items-center justify-center shadow-lg shadow-orange-500/25 transition-transform hover:rotate-0">
+              <Store size={38} className="text-white -rotate-3 hover:rotate-0 transition-transform" />
+            </div>
+            <div className="absolute -top-1 -right-1 bg-amber-300 text-orange-900 p-1.5 rounded-full shadow-sm">
+              <Sparkles size={14} />
+            </div>
           </div>
 
-          <div className="relative z-10">
-            <span className="bg-blue-500/40 text-blue-100 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-blue-300/30">
-              Gestión Comercial
-            </span>
-            <h1 className="text-2xl font-black tracking-tight mt-1 leading-none">Kiosko POS</h1>
-            <p className="text-xs text-blue-100/90 font-medium mt-1">Iniciá sesión para administrar tu comercio</p>
-          </div>
+          <span className="bg-orange-100 text-orange-800 text-[11px] font-bold tracking-wide px-3 py-1 rounded-full border border-orange-200/60 mb-1">
+            ¡Hola de nuevo! 👋
+          </span>
+          <h1 className="text-2xl font-black text-amber-950 tracking-tight">Kiosko POS</h1>
+          <p className="text-xs text-amber-800/80 font-medium max-w-[220px] mt-0.5">
+            Ingresá los datos de tu negocio para empezar el día
+          </p>
         </div>
 
-        {/* CUERPO DEL FORMULARIO */}
-        <div className="p-6 md:p-8">
+        {/* FORMULARIO */}
+        <div className="px-6 pb-8 pt-2">
           {mensaje && (
-            <div className="p-3.5 mb-5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold text-center flex items-center justify-center gap-2">
-              <span>⚠️</span>
+            <div className="p-3.5 mb-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold text-center flex items-center justify-center gap-2">
+              <span>😊</span>
               <span>{mensaje}</span>
             </div>
           )}
 
           <form onSubmit={manejarLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-bold text-amber-900/80 mb-1.5 ml-1">
                 Correo Electrónico
               </label>
               <div className="relative">
@@ -91,15 +93,15 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="ejemplo@kiosko.com"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+                  placeholder="hola@tukiosko.com"
+                  className="w-full pl-10 pr-4 py-3.5 border border-amber-200/80 rounded-2xl bg-amber-50/30 text-sm text-amber-950 placeholder:text-amber-800/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
                 />
-                <Mail size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
+                <Mail size={18} className="absolute left-3.5 top-4 text-amber-700/40" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-bold text-amber-900/80 mb-1.5 ml-1">
                 Contraseña
               </label>
               <div className="relative">
@@ -109,32 +111,25 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-4 py-3.5 border border-amber-200/80 rounded-2xl bg-amber-50/30 text-sm text-amber-950 placeholder:text-amber-800/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
                 />
-                <Lock size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
+                <Lock size={18} className="absolute left-3.5 top-4 text-amber-700/40" />
               </div>
             </div>
 
             <button
               type="submit"
               disabled={cargando}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4"
+              className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:from-gray-300 disabled:to-gray-300 text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-orange-500/25 transition-all active:scale-[0.98] mt-3"
             >
-              {cargando ? (
-                'Iniciando sesión...'
-              ) : (
-                <>
-                  <span>Ingresar al Sistema</span>
-                  <ArrowRight size={18} />
-                </>
-              )}
+              {cargando ? 'Entrando al sistema...' : 'Ingresar a mi Kiosko'}
             </button>
           </form>
 
-          {/* PIE DE PÁGINA / SEGURIDAD */}
-          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-slate-400 text-xs">
-            <ShieldCheck size={14} className="text-emerald-500" />
-            <span>Acceso seguro mediante Supabase Auth</span>
+          {/* MENSAJE AMISTOSO AL PIE */}
+          <div className="mt-6 pt-4 border-t border-amber-100/60 flex items-center justify-center gap-1.5 text-amber-800/60 text-xs font-medium">
+            <HeartHandshake size={15} className="text-orange-500" />
+            <span>Que tengas una excelente jornada de ventas</span>
           </div>
         </div>
 
