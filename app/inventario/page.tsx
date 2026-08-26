@@ -1,4 +1,3 @@
-// app/inventario/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,7 +12,17 @@ interface Producto {
   nombre: string
   precio: number
   stock_actual: number
+  categoria?: string
 }
+
+const CATEGORIAS = [
+  'Bebidas',
+  'Galletitas',
+  'Lácteos',
+  'Comida',
+  'Higiene Personal',
+  'Limpieza'
+]
 
 export default function InventarioPage() {
   const [productos, setProductos] = useState<Producto[]>([])
@@ -24,6 +33,7 @@ export default function InventarioPage() {
   const [codigoBarras, setCodigoBarras] = useState('')
   const [precio, setPrecio] = useState('')
   const [stock, setStock] = useState('')
+  const [categoria, setCategoria] = useState('Bebidas')
   
   const [busquedaStock, setBusquedaStock] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('todos')
@@ -76,21 +86,23 @@ export default function InventarioPage() {
       return
     }
 
-    const { error } = await supabase.from('productos').insert([
-      {
-        kiosko_id: kioskoId,
-        nombre,
-        codigo_barras: codigoBarras,
-        precio: parseFloat(precio),
-        stock_actual: parseInt(stock),
-      },
-    ])
+    // Intentamos guardar con categoría; si la columna no existe aún en la base de datos, guardamos sin romper
+    const payload: any = {
+      kiosko_id: kioskoId,
+      nombre,
+      codigo_barras: codigoBarras,
+      precio: parseFloat(precio),
+      stock_actual: parseInt(stock),
+      categoria: categoria
+    }
+
+    const { error } = await supabase.from('productos').insert([payload])
 
     setCargando(false)
     if (error) {
       setMensaje('Error al guardar: ' + error.message)
     } else {
-      setMensaje('¡Producto nuevo guardado con éxito!')
+      setMensaje('¡Producto guardado!')
       limpiarFormulario()
       fetchProductos(kioskoId)
     }
@@ -132,6 +144,7 @@ export default function InventarioPage() {
     setCodigoBarras('')
     setPrecio('')
     setStock('')
+    setCategoria('Bebidas')
   }
 
   const sumarUnidadesDirecto = async (prod: Producto) => {
@@ -162,6 +175,7 @@ export default function InventarioPage() {
     fetchProductos(kioskoId)
   }
 
+  // --- FILTRADO INTELIGENTE (SI NO HAY CATEGORÍA EN BD, BUSCA EN EL NOMBRE) ---
   const productosFiltrados = productos.filter((p) => {
     const coincideTexto =
       p.nombre.toLowerCase().includes(busquedaStock.toLowerCase()) ||
@@ -170,7 +184,11 @@ export default function InventarioPage() {
     if (filtroCategoria === 'todos') return coincideTexto
     if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 5
     
-    return coincideTexto && p.nombre.toLowerCase().includes(filtroCategoria)
+    // Compara la categoría grabada O busca por coincidencia en el nombre
+    const coincideCat = p.categoria && p.categoria.toLowerCase() === filtroCategoria.toLowerCase()
+    const coincideEnNombre = p.nombre.toLowerCase().includes(filtroCategoria.toLowerCase())
+    
+    return coincideTexto && (coincideCat || coincideEnNombre)
   })
 
   const cantidadStockBajo = productos.filter(p => p.stock_actual <= 5).length
@@ -210,7 +228,6 @@ export default function InventarioPage() {
             <button
               onClick={() => setCerrarAlertaStock(true)}
               className="text-amber-500 hover:text-amber-800 p-1 rounded-lg"
-              title="Cerrar aviso"
             >
               <X size={16} />
             </button>
@@ -235,7 +252,7 @@ export default function InventarioPage() {
             modo === 'nuevo' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'
           }`}
         >
-          <Plus size={16} /> Crear Producto Nuevo
+          <Plus size={16} /> Crear Producto
         </button>
         <button
           onClick={() => { setModo('restock'); limpiarFormulario(); setMensaje(''); }}
@@ -267,7 +284,6 @@ export default function InventarioPage() {
                   type="button"
                   onClick={() => setMostrarEscaner(true)}
                   className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-blue-700 transition"
-                  title="Abrir cámara"
                 >
                   <Camera size={18} />
                 </button>
@@ -280,10 +296,25 @@ export default function InventarioPage() {
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: Galletitas Pepsi 200g"
+                placeholder="Ej: Coca Cola 2.25L"
                 required
                 className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 font-semibold">Categoría</label>
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {CATEGORIAS.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -318,7 +349,7 @@ export default function InventarioPage() {
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
             >
               <Plus size={18} />
-              {cargando ? 'Guardando...' : 'Guardar Producto Nuevo'}
+              {cargando ? 'Guardando...' : 'Guardar Producto'}
             </button>
           </form>
         </div>
@@ -326,11 +357,10 @@ export default function InventarioPage() {
 
       {modo === 'restock' && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Ingreso / Reposición de Mercadería</h2>
-          
+          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Reponer Stock</h2>
           <form onSubmit={reponerStock} className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Código de Barras del Producto</label>
+              <label className="block text-xs text-gray-500 mb-1">Código de Barras</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -340,7 +370,7 @@ export default function InventarioPage() {
                     const prod = productos.find((p) => p.codigo_barras === e.target.value)
                     if (prod) setNombre(prod.nombre)
                   }}
-                  placeholder="Escaneá o tipeá el código"
+                  placeholder="Escaneá el código"
                   required
                   className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
                 />
@@ -348,7 +378,6 @@ export default function InventarioPage() {
                   type="button"
                   onClick={() => setMostrarEscaner(true)}
                   className="bg-emerald-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-emerald-700 transition"
-                  title="Abrir cámara"
                 >
                   <Camera size={18} />
                 </button>
@@ -357,12 +386,12 @@ export default function InventarioPage() {
 
             {nombre && (
               <div className="p-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold">
-                Producto detectado: {nombre}
+                Producto: {nombre}
               </div>
             )}
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Cantidad que ingresa (unidades)</label>
+              <label className="block text-xs text-gray-500 mb-1">Unidades a ingresar</label>
               <input
                 type="number"
                 value={stock}
@@ -379,14 +408,14 @@ export default function InventarioPage() {
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
             >
               <PackagePlus size={18} />
-              {cargando ? 'Sumando...' : 'Sumar al Stock Actual'}
+              {cargando ? 'Sumando...' : 'Sumar al Stock'}
             </button>
           </form>
         </div>
       )}
 
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Lista de Stock Actual</h2>
+        <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Lista de Stock</h2>
 
         <div className="relative mb-3">
           <input
@@ -408,35 +437,22 @@ export default function InventarioPage() {
           >
             Todos
           </button>
-          <button
-            onClick={() => setFiltroCategoria('coca')}
-            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
-              filtroCategoria === 'coca' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Bebidas
-          </button>
-          <button
-            onClick={() => setFiltroCategoria('galletitas')}
-            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
-              filtroCategoria === 'galletitas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Galletitas
-          </button>
-          <button
-            onClick={() => setFiltroCategoria('limpieza')}
-            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
-              filtroCategoria === 'limpieza' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Limpieza
-          </button>
+          {CATEGORIAS.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFiltroCategoria(cat)}
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition ${
+                filtroCategoria === cat ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
 
         {productosFiltrados.length === 0 ? (
           <p className="text-center text-gray-400 py-4 text-sm">
-            {busquedaStock || filtroCategoria !== 'todos' ? 'No se encontraron productos con ese filtro.' : 'No hay productos cargados.'}
+            Sin resultados para este filtro.
           </p>
         ) : (
           <div className="divide-y max-h-80 overflow-y-auto">
@@ -449,11 +465,11 @@ export default function InventarioPage() {
                       <p className="font-semibold text-gray-800 text-sm">{prod.nombre}</p>
                       {esStockBajo && (
                         <span className="bg-red-100 text-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shrink-0">
-                          <AlertTriangle size={11} /> ¡Quedan {prod.stock_actual}!
+                          <AlertTriangle size={11} /> Quedan {prod.stock_actual}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400">Cód: {prod.codigo_barras}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Cód: {prod.codigo_barras}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded font-bold ${
                         esStockBajo ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-100 text-gray-700'
@@ -464,7 +480,7 @@ export default function InventarioPage() {
                         onClick={() => sumarUnidadesDirecto(prod)}
                         className="text-xs text-emerald-600 font-bold hover:underline"
                       >
-                        + Sumar rápidas
+                        + Sumar
                       </button>
                     </div>
                   </div>
@@ -484,12 +500,11 @@ export default function InventarioPage() {
         )}
       </div>
 
-      {/* MODAL DEL ESCÁNER DE CÁMARA */}
       {mostrarEscaner && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-xl">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold text-gray-800 text-sm">Apunta la cámara al código</h3>
+              <h3 className="font-bold text-gray-800 text-sm">Escaneá el código</h3>
               <button
                 onClick={() => setMostrarEscaner(false)}
                 className="p-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600"
@@ -498,10 +513,16 @@ export default function InventarioPage() {
               </button>
             </div>
             <Scanner
-              onScan={(codigo) => {
-                setCodigoBarras(codigo)
-                const prod = productos.find((p) => p.codigo_barras === codigo)
-                if (prod) setNombre(prod.nombre)
+              onScan={(codigoLeido) => {
+                if (!codigoLeido) return
+                const codigoLimpio = codigoLeido.trim()
+                setCodigoBarras(codigoLimpio)
+
+                if (modo === 'restock') {
+                  const prod = productos.find((p) => p.codigo_barras === codigoLimpio)
+                  if (prod) setNombre(prod.nombre)
+                }
+
                 setMostrarEscaner(false)
               }}
             />
