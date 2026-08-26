@@ -1,23 +1,36 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Lock, Mail, Store, Sparkles, HeartHandshake } from 'lucide-react'
+import { Lock, Mail, HeartHandshake } from 'lucide-react'
+
+const FRASES_AMIGABLES = [
+  "Un café, tu cuenta y ¡a vender con todo hoy! ☕✨",
+  "Listos para abrir las puertas y romperla hoy 🚪🚀",
+  "Ingresá a tu espacio para arrancar la jornada 🛍️",
+  "Poné primera para empezar a registrar tus ventas de hoy 🔥"
+]
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
+  const [frase, setFrase] = useState('')
+  const [modoTaparOjos, setModoTaparOjos] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const fraseAleatoria = FRASES_AMIGABLES[Math.floor(Math.random() * FRASES_AMIGABLES.length)]
+    setFrase(fraseAleatoria)
+  }, [])
 
   const manejarLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setCargando(true)
     setMensaje('')
 
-    // 1. Autenticar con Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -29,7 +42,6 @@ export default function LoginPage() {
       return
     }
 
-    // 2. Consultar el rol del usuario en la tabla 'perfiles'
     const { data: perfil, error: perfilError } = await supabase
       .from('perfiles')
       .select('rol')
@@ -42,7 +54,6 @@ export default function LoginPage() {
       return
     }
 
-    // 3. Redirigir al panel principal
     router.push('/')
     router.refresh()
   }
@@ -51,25 +62,64 @@ export default function LoginPage() {
     <main className="min-h-screen bg-amber-50/60 flex items-center justify-center p-4 selection:bg-orange-200">
       <div className="bg-white rounded-[2.5rem] shadow-xl shadow-orange-950/5 overflow-hidden w-full max-w-md border border-orange-100 transition-all">
         
-        {/* CABECERA CÁLIDA Y AMIGABLE */}
-        <div className="relative pt-10 pb-8 px-6 bg-gradient-to-b from-orange-100/70 via-amber-50/40 to-white text-center flex flex-col items-center">
+        {/* CABECERA CÁLIDA CON ILUSTRACIÓN SVG ANIMADA */}
+        <div className="relative pt-8 pb-4 px-6 bg-gradient-to-b from-orange-100/70 via-amber-50/40 to-white text-center flex flex-col items-center">
           
-          {/* ÍCONO / LOGO EN CIRCULO FLOTANTE CÁLIDO */}
-          <div className="relative mb-3">
-            <div className="w-20 h-20 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-3xl rotate-3 flex items-center justify-center shadow-lg shadow-orange-500/25 transition-transform hover:rotate-0">
-              <Store size={38} className="text-white -rotate-3 hover:rotate-0 transition-transform" />
-            </div>
-            <div className="absolute -top-1 -right-1 bg-amber-300 text-orange-900 p-1.5 rounded-full shadow-sm">
-              <Sparkles size={14} />
-            </div>
+          {/* MASCOTA KIOSKITO VECTORIAL (SVG) */}
+          <div className="relative w-32 h-32 flex items-center justify-center">
+            <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-md">
+              {/* Toldo */}
+              <path d="M40 80 Q100 60 160 80 L170 100 Q100 90 30 100 Z" fill="#F97316" />
+              <path d="M40 80 Q70 70 100 80 L100 100 Q70 90 30 100 Z" fill="#FB923C" />
+              <path d="M130 80 Q145 75 160 80 L170 100 Q150 95 130 100 Z" fill="#FB923C" />
+
+              {/* Cuerpo / Estructura del Kiosko */}
+              <rect x="45" y="95" width="110" height="80" rx="16" fill="#FDBA74" />
+              <rect x="52" y="102" width="96" height="66" rx="12" fill="#FFF7ED" />
+
+              {/* Ventanita / Cara del Kiosko */}
+              <circle cx="75" cy="125" r="7" fill="#451A03" />
+              <circle cx="125" cy="125" r="7" fill="#451A03" />
+              
+              {/* Ojos tapados si está escribiendo la contraseña */}
+              {modoTaparOjos ? (
+                <>
+                  <path d="M68 125 Q75 120 82 125" stroke="#451A03" strokeWidth="3" strokeLinecap="round" fill="none" />
+                  <path d="M118 125 Q125 120 132 125" stroke="#451A03" strokeWidth="3" strokeLinecap="round" fill="none" />
+                  {/* Manitas tapando los ojos */}
+                  <circle cx="75" cy="125" r="10" fill="#F97316" />
+                  <circle cx="125" cy="125" r="10" fill="#F97316" />
+                </>
+              ) : (
+                <>
+                  {/* Brillo en ojos */}
+                  <circle cx="77" cy="123" r="2" fill="#FFFFFF" />
+                  <circle cx="127" cy="123" r="2" fill="#FFFFFF" />
+                </>
+              )}
+
+              {/* Sonrisa y Mejillas */}
+              <path d="M92 135 Q100 143 108 135" stroke="#451A03" strokeWidth="3" strokeLinecap="round" fill="none" />
+              <circle cx="65" cy="133" r="4" fill="#FCA5A5" opacity="0.7" />
+              <circle cx="135" cy="133" r="4" fill="#FCA5A5" opacity="0.7" />
+
+              {/* Mostrador */}
+              <rect x="40" y="150" width="120" height="12" rx="6" fill="#F97316" />
+              
+              {/* Vapores de café o estrellitas flotando */}
+              <path d="M165 110 Q170 100 165 90" stroke="#F97316" strokeWidth="2" strokeLinecap="round" fill="none" className="animate-pulse" />
+              <circle cx="35" cy="115" r="3" fill="#FBBF24" />
+              <circle cx="168" cy="135" r="2" fill="#FBBF24" />
+            </svg>
           </div>
 
           <span className="bg-orange-100 text-orange-800 text-[11px] font-bold tracking-wide px-3 py-1 rounded-full border border-orange-200/60 mb-1">
             ¡Hola de nuevo! 👋
           </span>
           <h1 className="text-2xl font-black text-amber-950 tracking-tight">Kiosko POS</h1>
-          <p className="text-xs text-amber-800/80 font-medium max-w-[220px] mt-0.5">
-            Ingresá los datos de tu negocio para empezar el día
+          
+          <p className="text-xs text-amber-800/80 font-medium max-w-[260px] mt-1 min-h-[32px] flex items-center justify-center">
+            {frase || 'Cargando...'}
           </p>
         </div>
 
@@ -92,6 +142,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setModoTaparOjos(false)}
                   required
                   placeholder="hola@tukiosko.com"
                   className="w-full pl-10 pr-4 py-3.5 border border-amber-200/80 rounded-2xl bg-amber-50/30 text-sm text-amber-950 placeholder:text-amber-800/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
@@ -109,6 +160,8 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setModoTaparOjos(true)}
+                  onBlur={() => setModoTaparOjos(false)}
                   required
                   placeholder="••••••••"
                   className="w-full pl-10 pr-4 py-3.5 border border-amber-200/80 rounded-2xl bg-amber-50/30 text-sm text-amber-950 placeholder:text-amber-800/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
@@ -126,7 +179,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* MENSAJE AMISTOSO AL PIE */}
           <div className="mt-6 pt-4 border-t border-amber-100/60 flex items-center justify-center gap-1.5 text-amber-800/60 text-xs font-medium">
             <HeartHandshake size={15} className="text-orange-500" />
             <span>Que tengas una excelente jornada de ventas</span>
