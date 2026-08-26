@@ -1,11 +1,10 @@
-// app/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Sparkles, PackageSearch, ShoppingBag, DollarSign, Store, ArrowRight, LogOut } from 'lucide-react'
+import { Sparkles, PackageSearch, ShoppingBag, DollarSign, Store, ArrowRight, LogOut, Users, TrendingUp } from 'lucide-react'
 
 export default function Home() {
   const [rol, setRol] = useState<string | null>(null)
@@ -29,7 +28,6 @@ export default function Home() {
           .single()
 
         if (error || !perfil) {
-          // Si no encuentra el perfil o hay error, por seguridad asignamos empleado
           setRol('empleado')
         } else {
           setRol(perfil.rol)
@@ -58,13 +56,13 @@ export default function Home() {
     )
   }
 
-  // Definimos permisos según el rol
+  // Permisos según el rol
   const esSuperAdminOrAdmin = rol === 'super_admin' || rol === 'admin'
   const puedeVerCaja = rol === 'super_admin' || rol === 'admin' || rol === 'empleado'
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6 max-w-xl mx-auto flex flex-col justify-center">
-      {/* Header & Branding Moderno */}
+      {/* Header & Branding */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6 text-center relative overflow-hidden">
         <div className="absolute top-4 right-4">
           <button
@@ -97,9 +95,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Grilla Principal adaptativa según el rol */}
+      {/* Grilla Principal */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Punto de Venta (Disponible para todos) */}
+        {/* Punto de Venta */}
         <Link
           href="/ventas"
           className="group relative bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-5 rounded-3xl shadow-md shadow-emerald-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-emerald-500/30 overflow-hidden"
@@ -116,7 +114,7 @@ export default function Home() {
           </div>
         </Link>
 
-        {/* Inventario (Solo Admin / Super Admin) */}
+        {/* Inventario */}
         {esSuperAdminOrAdmin && (
           <Link
             href="/inventario"
@@ -135,7 +133,7 @@ export default function Home() {
           </Link>
         )}
 
-        {/* Promociones (Solo Admin / Super Admin) */}
+        {/* Promociones */}
         {esSuperAdminOrAdmin && (
           <Link
             href="/promociones"
@@ -154,7 +152,7 @@ export default function Home() {
           </Link>
         )}
 
-        {/* Caja del Día (Disponible para Admin y Empleados) */}
+        {/* Caja del Día */}
         {puedeVerCaja && (
           <Link
             href="/caja"
@@ -169,6 +167,44 @@ export default function Home() {
             <div>
               <h2 className="font-bold text-xl leading-tight text-slate-900">Caja del Día</h2>
               <p className="text-xs text-slate-500 font-medium mt-1">Totales, arqueo y cierres</p>
+            </div>
+          </Link>
+        )}
+
+        {/* Personal / Usuarios (Solo Admin / Super Admin) */}
+        {esSuperAdminOrAdmin && (
+          <Link
+            href="/usuarios"
+            className="group relative bg-gradient-to-br from-blue-600 to-cyan-600 text-white p-5 rounded-3xl shadow-md shadow-blue-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-blue-500/30 overflow-hidden"
+          >
+            <div className="flex justify-between items-start">
+              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
+                <Users size={26} />
+              </div>
+              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
+            </div>
+            <div>
+              <h2 className="font-bold text-xl leading-tight">Personal</h2>
+              <p className="text-xs text-blue-100 font-medium mt-1">Crear usuarios y turnos</p>
+            </div>
+          </Link>
+        )}
+
+        {/* Métricas & Popularidad (Solo Admin / Super Admin) */}
+        {esSuperAdminOrAdmin && (
+          <Link
+            href="/metricas"
+            className="group relative bg-gradient-to-br from-amber-500 to-orange-600 text-white p-5 rounded-3xl shadow-md shadow-amber-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-amber-500/30 overflow-hidden"
+          >
+            <div className="flex justify-between items-start">
+              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
+                <TrendingUp size={26} />
+              </div>
+              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
+            </div>
+            <div>
+              <h2 className="font-bold text-xl leading-tight">Métricas</h2>
+              <p className="text-xs text-amber-100 font-medium mt-1">Más vendidos y rotación</p>
             </div>
           </Link>
         )}
