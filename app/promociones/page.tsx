@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Tag } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Tag, Edit2 } from 'lucide-react'
 
 // Interfaces basadas en la base de datos
 interface Promocion {
@@ -87,6 +87,32 @@ export default function PromocionesPage() {
       setMensaje('¡Promoción cargada con éxito!')
       limpiarFormulario()
       setModo('lista')
+      fetchPromociones(kioskoId)
+    }
+  }
+
+  // FUNCIÓN PARA EDITAR EL PRECIO DE LA PROMOCIÓN DIRECTAMENTE
+  const editarPrecioPromo = async (promo: Promocion) => {
+    if (!kioskoId) return
+
+    const nuevoPrecioStr = prompt(`Actualizar precio para "${promo.nombre}" (Actual: $${promo.precio}):`, promo.precio.toString())
+    if (nuevoPrecioStr === null) return // Si cancela, no hace nada
+    
+    const nuevoPrecio = parseFloat(nuevoPrecioStr)
+    if (isNaN(nuevoPrecio)) {
+      alert('El precio ingresado no es válido.')
+      return
+    }
+
+    const { error } = await supabase
+      .from('promociones')
+      .update({ precio: nuevoPrecio })
+      .eq('id', promo.id)
+      .eq('kiosko_id', kioskoId)
+
+    if (error) {
+      alert('Error al actualizar la promoción: ' + error.message)
+    } else {
       fetchPromociones(kioskoId)
     }
   }
@@ -175,10 +201,21 @@ export default function PromocionesPage() {
                   </button>
                 </div>
 
-                <div className="flex justify-between items-center text-xs text-gray-600 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Tag size={14} className="text-blue-600" />
-                    <span className="font-bold text-gray-800">${promo.precio.toLocaleString()}</span>
+                <div className="flex justify-between items-center text-xs text-gray-600 mb-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Tag size={14} className="text-blue-600" />
+                      <span className="font-bold text-gray-800 text-sm">${promo.precio.toLocaleString()}</span>
+                    </div>
+
+                    {/* BOTÓN DE EDICIÓN RÁPIDA DE PRECIO */}
+                    <button
+                      onClick={() => editarPrecioPromo(promo)}
+                      className="bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                      title="Editar precio"
+                    >
+                      <Edit2 size={12} /> Editar
+                    </button>
                   </div>
                 </div>
               </div>

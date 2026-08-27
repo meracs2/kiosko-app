@@ -31,6 +31,7 @@ export default function LoginPage() {
     setCargando(true)
     setMensaje('')
 
+    // 1. Iniciar sesión en Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -42,20 +43,53 @@ export default function LoginPage() {
       return
     }
 
+    // 2. Traer perfil completo incluyendo horarios
     const { data: perfil, error: perfilError } = await supabase
       .from('perfiles')
-      .select('rol')
+      .select('rol, hora_inicio, hora_fin')
       .eq('id', authData.user.id)
       .single()
 
     if (perfilError || !perfil) {
       setMensaje('Error al obtener los permisos del usuario.')
+      await supabase.auth.signOut()
       setCargando(false)
       return
     }
 
-    router.push('/')
-    router.refresh()
+    // 3. Libre albedrío para Admins y Super Admins
+    if (perfil.rol === 'admin' || perfil.rol === 'super_admin') {
+      window.location.href = '/'
+      return
+    }
+
+    // 4. Bloqueo estricto para Empleados fuera de horario
+    if (perfil.rol === 'empleado') {
+      const inicio = perfil.hora_inicio || '08:00'
+      const fin = perfil.hora_fin || '17:00'
+
+      const ahora = new Date()
+      const horas = String(ahora.getHours()).padStart(2, '0')
+      const minutos = String(ahora.getMinutes()).padStart(2, '0')
+      const horaActualStr = `${horas}:${minutos}`
+
+      let dentroDeHorario = false
+      if (inicio <= fin) {
+        dentroDeHorario = horaActualStr >= inicio && horaActualStr <= fin
+      } else {
+        dentroDeHorario = horaActualStr >= inicio || horaActualStr <= fin
+      }
+
+      if (!dentroDeHorario) {
+        setMensaje(`⏰ Acceso denegado. Tu turno es de ${inicio} a ${fin} hs. Son las ${horaActualStr} hs.`)
+        await supabase.auth.signOut()
+        setCargando(false)
+        return
+      }
+    }
+
+    // 5. Si todo está correcto, ingresa limpiamente
+    window.location.href = '/'
   }
 
   return (

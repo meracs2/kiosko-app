@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus, AlertTriangle, X } from 'lucide-react'
+import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus, AlertTriangle, X, Edit2 } from 'lucide-react'
 
 interface Producto {
   id: string
@@ -86,7 +86,6 @@ export default function InventarioPage() {
       return
     }
 
-    // Intentamos guardar con categoría; si la columna no existe aún en la base de datos, guardamos sin romper
     const payload: any = {
       kiosko_id: kioskoId,
       nombre,
@@ -147,19 +146,40 @@ export default function InventarioPage() {
     setCategoria('Bebidas')
   }
 
-  const sumarUnidadesDirecto = async (prod: Producto) => {
+  // FUNCIÓN DE EDICIÓN COMPLETA DIRECTA (Precio y Stock)
+  const editarProductoCompleto = async (prod: Producto) => {
     if (!kioskoId) return
-    const ingreso = prompt(`¿Cuántas unidades ingresaron para "${prod.nombre}"?`, '10')
-    if (!ingreso || isNaN(Number(ingreso))) return
 
-    const nuevoStock = prod.stock_actual + parseInt(ingreso)
-    await supabase
+    const nuevoPrecioStr = prompt(`Actualizar precio para "${prod.nombre}" (Actual: $${prod.precio}):`, prod.precio.toString())
+    if (nuevoPrecioStr === null) return
+    const nuevoPrecio = parseFloat(nuevoPrecioStr)
+    if (isNaN(nuevoPrecio)) {
+      alert('El precio ingresado no es válido.')
+      return
+    }
+
+    const nuevoStockStr = prompt(`Actualizar stock para "${prod.nombre}" (Actual: ${prod.stock_actual} un.):`, prod.stock_actual.toString())
+    if (nuevoStockStr === null) return
+    const nuevoStock = parseInt(nuevoStockStr)
+    if (isNaN(nuevoStock)) {
+      alert('El stock ingresado no es válido.')
+      return
+    }
+
+    const { error } = await supabase
       .from('productos')
-      .update({ stock_actual: nuevoStock })
+      .update({ 
+        precio: nuevoPrecio,
+        stock_actual: nuevoStock 
+      })
       .eq('id', prod.id)
       .eq('kiosko_id', kioskoId)
 
-    fetchProductos(kioskoId)
+    if (error) {
+      alert('Error al actualizar el producto: ' + error.message)
+    } else {
+      fetchProductos(kioskoId)
+    }
   }
 
   const eliminarProducto = async (id: string) => {
@@ -175,23 +195,22 @@ export default function InventarioPage() {
     fetchProductos(kioskoId)
   }
 
-  // --- FILTRADO INTELIGENTE (SI NO HAY CATEGORÍA EN BD, BUSCA EN EL NOMBRE) ---
+  // LÍMITE DE STOCK BAJO FIJADO EN <= 2
   const productosFiltrados = productos.filter((p) => {
     const coincideTexto =
       p.nombre.toLowerCase().includes(busquedaStock.toLowerCase()) ||
       p.codigo_barras.includes(busquedaStock)
 
     if (filtroCategoria === 'todos') return coincideTexto
-    if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 5
+    if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 2
     
-    // Compara la categoría grabada O busca por coincidencia en el nombre
     const coincideCat = p.categoria && p.categoria.toLowerCase() === filtroCategoria.toLowerCase()
     const coincideEnNombre = p.nombre.toLowerCase().includes(filtroCategoria.toLowerCase())
     
     return coincideTexto && (coincideCat || coincideEnNombre)
   })
 
-  const cantidadStockBajo = productos.filter(p => p.stock_actual <= 5).length
+  const cantidadStockBajo = productos.filter(p => p.stock_actual <= 2).length
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
@@ -214,7 +233,7 @@ export default function InventarioPage() {
               <AlertTriangle size={18} />
             </div>
             <div>
-              <p className="text-xs font-bold text-amber-900">¡Hay {cantidadStockBajo} producto(s) con stock bajo!</p>
+              <p className="text-xs font-bold text-amber-900">¡Hay {cantidadStockBajo} producto(s) con stock bajo (2 o menos)!</p>
               <p className="text-[11px] text-amber-700">Revisá la lista para reponer mercadería.</p>
             </div>
           </div>
@@ -457,7 +476,7 @@ export default function InventarioPage() {
         ) : (
           <div className="divide-y max-h-80 overflow-y-auto">
             {productosFiltrados.map((prod) => {
-              const esStockBajo = prod.stock_actual <= 5
+              const esStockBajo = prod.stock_actual <= 2
               return (
                 <div key={prod.id} className="py-3 flex justify-between items-center">
                   <div>
@@ -476,16 +495,20 @@ export default function InventarioPage() {
                       }`}>
                         Stock: {prod.stock_actual} un.
                       </span>
-                      <button
-                        onClick={() => sumarUnidadesDirecto(prod)}
-                        className="text-xs text-emerald-600 font-bold hover:underline"
-                      >
-                        + Sumar
-                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <span className="font-bold text-green-600 text-sm">${prod.precio}</span>
+                    
+                    {/* BOTÓN ÚNICO DE EDICIÓN (PRECIO Y STOCK) */}
+                    <button
+                      onClick={() => editarProductoCompleto(prod)}
+                      className="bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                      title="Editar precio y stock"
+                    >
+                      <Edit2 size={13} /> Editar
+                    </button>
+
                     <button
                       onClick={() => eliminarProducto(prod.id)}
                       className="text-red-500 hover:text-red-700 p-1"

@@ -21,17 +21,47 @@ export default function Home() {
           return
         }
 
+        // 1. Pedimos el perfil completo con los horarios
         const { data: perfil, error } = await supabase
           .from('perfiles')
-          .select('rol')
+          .select('rol, hora_inicio, hora_fin')
           .eq('id', session.user.id)
           .single()
 
         if (error || !perfil) {
+          console.error("Error al obtener perfil:", error)
           setRol('empleado')
-        } else {
-          setRol(perfil.rol)
+          setCargando(false)
+          return
         }
+
+        // 2. Si es empleado, validamos el turno estrictamente
+        if (perfil.rol === 'empleado') {
+          const inicio = perfil.hora_inicio || '08:00'
+          const fin = perfil.hora_fin || '17:00'
+
+          const ahora = new Date()
+          const horas = String(ahora.getHours()).padStart(2, '0')
+          const minutos = String(ahora.getMinutes()).padStart(2, '0')
+          const horaActualStr = `${horas}:${minutos}`
+
+          let dentroDeHorario = false
+          if (inicio <= fin) {
+            dentroDeHorario = horaActualStr >= inicio && horaActualStr <= fin
+          } else {
+            dentroDeHorario = horaActualStr >= inicio || horaActualStr <= fin
+          }
+
+          // SI ESTÁ FUERA DE TURNO: Expulsión inmediata
+          if (!dentroDeHorario) {
+            alert(`⏰ Fuera de turno. Tu horario es de ${inicio} a ${fin} hs. Son las ${horaActualStr} hs.`)
+            await supabase.auth.signOut()
+            window.location.href = '/login'
+            return
+          }
+        }
+
+        setRol(perfil.rol)
       } catch (err) {
         console.error('Error al verificar sesión:', err)
         setRol('empleado')
@@ -51,7 +81,7 @@ export default function Home() {
   if (cargando) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-sm font-semibold text-slate-500 animate-pulse">Cargando sistema...</p>
+        <p className="text-sm font-semibold text-slate-500 animate-pulse">Verificando turno y permisos...</p>
       </main>
     )
   }
@@ -171,7 +201,7 @@ export default function Home() {
           </Link>
         )}
 
-        {/* Personal / Usuarios (Solo Admin / Super Admin) */}
+        {/* Personal / Usuarios */}
         {esSuperAdminOrAdmin && (
           <Link
             href="/usuarios"
@@ -190,7 +220,7 @@ export default function Home() {
           </Link>
         )}
 
-        {/* Métricas & Popularidad (Solo Admin / Super Admin) */}
+        {/* Métricas & Popularidad */}
         {esSuperAdminOrAdmin && (
           <Link
             href="/metricas"

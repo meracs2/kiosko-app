@@ -1,18 +1,21 @@
+// app/usuarios/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, UserPlus, Trash2, Edit2, X, Check } from 'lucide-react'
+import { ArrowLeft, UserPlus, Trash2, Edit2, X, Check, Clock } from 'lucide-react'
 
 export default function UsuariosPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [nombre, setNombre] = useState('')
   const [rol, setRol] = useState('empleado')
+  const [horaInicio, setHoraInicio] = useState('08:00')
+  const [horaFin, setHoraFin] = useState('17:00')
+  
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(false)
-  
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -29,7 +32,6 @@ export default function UsuariosPage() {
       .order('email', { ascending: true })
 
     if (!error && data) {
-      // Filtramos para ocultar la cuenta de 'super_admin' de la lista visual
       const usuariosFiltrados = data.filter((u) => u.rol !== 'super_admin')
       setUsuarios(usuariosFiltrados)
     }
@@ -41,24 +43,40 @@ export default function UsuariosPage() {
     setMensaje('')
 
     try {
+      // 1. Guardamos la sesión actual del Admin antes de crear el usuario
+      const { data: sesionActual } = await supabase.auth.getSession()
+
+      // 2. Creamos el usuario
       const { error: errorAuth } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { 
             nombre_completo: nombre,
-            rol: rol 
+            rol: rol,
+            hora_inicio: horaInicio,
+            hora_fin: horaFin
           }
         }
       })
 
       if (errorAuth) throw errorAuth
 
-      setMensaje('✅ Usuario creado con éxito')
+      // 3. Restauramos instantáneamente la sesión del Admin para que no se desconecte
+      if (sesionActual && sesionActual.session) {
+        await supabase.auth.setSession({
+          access_token: sesionActual.session.access_token,
+          refresh_token: sesionActual.session.refresh_token,
+        })
+      }
+
+      setMensaje('✅ Usuario creado con éxito (Tu sesión sigue activa)')
       setEmail('')
       setPassword('')
       setNombre('')
       setRol('empleado')
+      setHoraInicio('08:00')
+      setHoraFin('17:00')
       setMostrarFormulario(false)
       cargarUsuarios()
     } catch (err: any) {
@@ -72,7 +90,6 @@ export default function UsuariosPage() {
     if (!confirm('¿Estás seguro de eliminar este usuario por completo? No podrá volver a iniciar sesión.')) return
 
     try {
-      // Llamamos a la función segura en Supabase que borra de Auth y perfiles
       const { error } = await supabase.rpc('eliminar_usuario_completo', {
         usuario_id: id
       })
@@ -94,7 +111,9 @@ export default function UsuariosPage() {
         .from('perfiles')
         .update({
           rol: usuarioEditando.rol,
-          email: usuarioEditando.email
+          email: usuarioEditando.email,
+          hora_inicio: usuarioEditando.hora_inicio,
+          hora_fin: usuarioEditando.hora_fin
         })
         .eq('id', usuarioEditando.id)
 
@@ -117,7 +136,7 @@ export default function UsuariosPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 leading-tight">Personal</h1>
-            <p className="text-xs text-gray-500">Gestión de accesos y roles del sistema</p>
+            <p className="text-xs text-gray-500">Gestión de accesos, roles y turnos</p>
           </div>
         </div>
       </div>
@@ -196,6 +215,27 @@ export default function UsuariosPage() {
               </select>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1 font-semibold">Hora Entrada</label>
+                <input
+                  type="time"
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1 font-semibold">Hora Salida</label>
+                <input
+                  type="time"
+                  value={horaFin}
+                  onChange={(e) => setHoraFin(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                />
+              </div>
+            </div>
+
             <button
               type="submit"
               disabled={cargando}
@@ -235,16 +275,35 @@ export default function UsuariosPage() {
                       <option value="empleado">empleado</option>
                       <option value="admin">admin</option>
                     </select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="time"
+                        value={usuarioEditando.hora_inicio || '08:00'}
+                        onChange={(e) => setUsuarioEditando({ ...usuarioEditando, hora_inicio: e.target.value })}
+                        className="p-1.5 border rounded-lg text-xs bg-gray-50"
+                      />
+                      <input
+                        type="time"
+                        value={usuarioEditando.hora_fin || '17:00'}
+                        onChange={(e) => setUsuarioEditando({ ...usuarioEditando, hora_fin: e.target.value })}
+                        className="p-1.5 border rounded-lg text-xs bg-gray-50"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-gray-800 text-sm">{u.email}</p>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs px-2 py-0.5 rounded font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
                         {u.rol || 'empleado'}
                       </span>
+                      {u.hora_inicio && u.hora_fin && (
+                        <span className="text-xs px-2 py-0.5 rounded font-medium bg-gray-100 text-gray-600 flex items-center gap-1">
+                          <Clock size={12} /> {u.hora_inicio} a {u.hora_fin} hs
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
