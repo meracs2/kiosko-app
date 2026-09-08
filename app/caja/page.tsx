@@ -8,7 +8,8 @@ import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculato
 
 interface DetalleVenta {
   id: string
-  nombre_producto: string
+  nombre_producto?: string
+  producto_nombre?: string
   cantidad: number
   precio_unitario: number
 }
@@ -21,7 +22,6 @@ interface Venta {
   pago_efectivo?: number
   pago_tarjeta?: number
   pago_transferencia?: number
-  detalle_ventas?: DetalleVenta[]
 }
 
 export default function CajaPage() {
@@ -29,6 +29,9 @@ export default function CajaPage() {
   const [cargando, setCargando] = useState(true)
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null)
   const [kioskoId, setKioskoId] = useState<string | null>(null)
+  
+  // Mapeo seguro para guardar los ítems de cada venta según su ID
+  const [detallesMap, setDetallesMap] = useState<{ [key: string]: DetalleVenta[] }>({})
 
   // Fecha del último cierre guardada en el navegador (en milisegundos)
   const [ultimoCierre, setUltimoCierre] = useState<number>(0)
@@ -40,13 +43,17 @@ export default function CajaPage() {
 
   const fetchVentas = async (idKiosko: string) => {
     setCargando(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('ventas')
-      .select('*, detalle_ventas(*)')
+      .select('*')
       .eq('kiosko_id', idKiosko)
       .order('created_at', { ascending: false })
 
-    if (data) setVentas(data)
+    if (error) {
+      console.error('Error al cargar ventas:', error)
+    } else if (data) {
+      setVentas(data)
+    }
     setCargando(false)
   }
 
@@ -80,7 +87,7 @@ export default function CajaPage() {
     return fechaVentaMs > ultimoCierre
   })
 
-  // Totales del sistema considerando pagos mixtos individuales
+  // Totales del sistema
   const sisEfectivo = ventasDelTurno.reduce(
     (acc, v) => acc + Number(v.pago_efectivo ?? (v.metodo_pago === 'efectivo' ? v.total : 0)),
     0
@@ -104,15 +111,55 @@ export default function CajaPage() {
 
   const diferencia = totalManual - sisTotal
 
-  const toggleExpandir = (id: string) => {
-    setVentaExpandida(ventaExpandida === id ? null : id)
+  const toggleExpandir = async (id: string) => {
+    if (ventaExpandida === id) {
+      setVentaExpandida(null)
+    } else {
+      setVentaExpandida(id)
+      
+      // Si ya tenemos los ítems en memoria, no volvemos a consultar
+      if (!detallesMap[id]) {
+        let itemsEncontrados: DetalleVenta[] = []
+
+        // Intento 1: Buscar usando 'venta_id'
+        const res1 = await supabase
+          .from('detalle_ventas')
+          .select('*')
+          .eq('venta_id', id)
+        
+        if (res1.data && res1.data.length > 0) {
+          itemsEncontrados = res1.data
+        } else {
+          // Intento 2: Buscar usando 'id_venta' por si tu columna se llama así
+          const res2 = await supabase
+            .from('detalle_ventas')
+            .select('*')
+            .eq('id_venta', id)
+          
+          if (res2.data && res2.data.length > 0) {
+            itemsEncontrados = res2.data
+          } else {
+            // Intento 3: Buscar usando 'venta' a secas
+            const res3 = await supabase
+              .from('detalle_ventas')
+              .select('*')
+              .eq('venta', id)
+            
+            if (res3.data && res3.data.length > 0) {
+              itemsEncontrados = res3.data
+            }
+          }
+        }
+
+        // Guardamos el resultado en el estado (aunque esté vacío para saber que ya se consultó)
+        setDetallesMap((prev) => ({ ...prev, [id]: itemsEncontrados }))
+      }
+    }
   }
 
-  // Función para generar y descargar el reporte localmente compatible con Excel
   const descargarReporteExcelLocal = () => {
     const fechaHoraActual = new Date().toLocaleString()
-    
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // \uFEFF asegura soporte para tildes y caracteres latinos
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
     
     csvContent += "REPORTE DE CIERRE DE TURNO - KIOSKO POS\n";
     csvContent += `Fecha y Hora de Cierre:, "${fechaHoraActual}"\n\n`;
@@ -131,22 +178,17 @@ export default function CajaPage() {
     csvContent += `Diferencia (Sobrante/Faltante),$${diferencia}\n\n`;
 
     csvContent += "DETALLE DE VENTAS DEL TURNO\n";
-    csvContent += "ID Venta,Fecha y Hora,Método,Efectivo,Tarjeta,Transferencia,Total,Detalle Ítems\n";
+    csvContent += "ID Venta,Fecha y Hora,Método,Total\n";
 
     ventasDelTurno.forEach((v) => {
       const fechaVenta = new Date(v.created_at).toLocaleString();
-      const detalleTexto = v.detalle_ventas 
-        ? v.detalle_ventas.map(i => `${i.cantidad}x ${i.nombre_producto}`).join(' | ') 
-        : 'Sin detalle';
-      
-      csvContent += `"${v.id}","${fechaVenta}","${v.metodo_pago}",$${v.pago_efectivo || 0},$${v.pago_tarjeta || 0},$${v.pago_transferencia || 0},$${v.total},"${detalleTexto}"\n`;
+      csvContent += `"${v.id}","${fechaVenta}","${v.metodo_pago}",$${v.total}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    const nombreArchivo = `Cierre_Turno_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.setAttribute("download", nombreArchivo);
+    link.setAttribute("download", `Cierre_Turno_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -158,14 +200,9 @@ export default function CajaPage() {
       return
     }
 
-    const confirmar = window.confirm(
-      '¿Estás seguro de realizar el Cierre de Caja? Esto guardará un archivo Excel en tu dispositivo y pondrá los contadores en $0 para el nuevo turno.'
-    )
-    if (!confirmar) return
+    if (!window.confirm('¿Estás seguro de realizar el Cierre de Caja? Esto descargará el Excel y reiniciará los contadores a $0.')) return
 
-    // Generamos y descargamos el archivo localmente
     descargarReporteExcelLocal()
-
     const ahoraMs = Date.now()
     localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
     setUltimoCierre(ahoraMs)
@@ -173,13 +210,12 @@ export default function CajaPage() {
     setManualEfectivo('')
     setManualTarjeta('')
     setManualTransf('')
-
-    alert('¡Caja cerrada, archivo Excel descargado y contadores reiniciados con éxito!')
+    alert('¡Caja cerrada y contadores reiniciados con éxito!')
   }
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Header Integrado */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <Link
@@ -226,7 +262,7 @@ export default function CajaPage() {
         </div>
       </div>
 
-      {/* Formulario de Cierre / Arqueo Manual */}
+      {/* Arqueo Manual */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center gap-2 text-sm">
           <Calculator size={18} />
@@ -274,7 +310,6 @@ export default function CajaPage() {
           </div>
         </div>
 
-        {/* Resultado del Arqueo */}
         {(manualEfectivo || manualTarjeta || manualTransf) && (
           <div className="mt-4 pt-3 border-t">
             <div className="flex justify-between items-center mb-2 text-sm">
@@ -308,7 +343,6 @@ export default function CajaPage() {
           </div>
         )}
 
-        {/* Botón de Cierre de Turno */}
         <button
           onClick={handleCierreCaja}
           className="w-full mt-5 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
@@ -318,7 +352,7 @@ export default function CajaPage() {
         </button>
       </div>
 
-      {/* Historial de Ventas del Turno con Detalle y Pagos Mixtos */}
+      {/* Historial de Ventas */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center gap-2 text-sm">
           <Calendar size={18} />
@@ -331,6 +365,8 @@ export default function CajaPage() {
           <div className="divide-y max-h-80 overflow-y-auto">
             {ventasDelTurno.map((v) => {
               const estaExpandida = ventaExpandida === v.id
+              const itemsVenta = detallesMap[v.id]
+
               return (
                 <div key={v.id} className="py-2.5">
                   <button
@@ -342,26 +378,21 @@ export default function CajaPage() {
                         <p className="font-bold text-gray-800 text-sm">
                           ${Number(v.total).toLocaleString()}
                         </p>
-                        {v.metodo_pago === 'mixto' ? (
-                          <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-semibold">
-                            Mixto (Ef: ${v.pago_efectivo || 0} | Tarj: ${v.pago_tarjeta || 0} | Tr: ${v.pago_transferencia || 0})
-                          </span>
-                        ) : (
-                          <span
-                            className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-                              v.metodo_pago === 'efectivo'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : v.metodo_pago === 'tarjeta'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-purple-100 text-purple-700'
-                            }`}
-                          >
-                            {v.metodo_pago}
-                          </span>
-                        )}
+                        <span
+                          className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                            v.metodo_pago === 'efectivo'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : v.metodo_pago === 'tarjeta'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}
+                        >
+                          {v.metodo_pago}
+                        </span>
                       </div>
                       <span className="text-xs text-gray-400">
-                        {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({v.detalle_ventas?.length || 0} ítems)
+                        {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 
+                        {itemsVenta ? ` (${itemsVenta.length} ítems)` : ' (Ver detalle)'}
                       </span>
                     </div>
 
@@ -370,18 +401,24 @@ export default function CajaPage() {
                     </div>
                   </button>
 
-                  {estaExpandida && v.detalle_ventas && (
+                  {estaExpandida && (
                     <div className="mt-2 pl-3 border-l-2 border-blue-500 bg-gray-50 p-2.5 rounded-r-lg space-y-1">
-                      {v.detalle_ventas.map((item) => (
-                        <div key={item.id} className="flex justify-between items-center text-xs">
-                          <span className="text-gray-700 font-medium">
-                            {item.cantidad}x {item.nombre_producto}
-                          </span>
-                          <span className="text-gray-500 font-semibold">
-                            ${(item.precio_unitario * item.cantidad).toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
+                      {!itemsVenta ? (
+                        <p className="text-xs text-gray-400 py-1">Cargando productos...</p>
+                      ) : itemsVenta.length === 0 ? (
+                        <p className="text-xs text-gray-400 py-1">Esta venta no registró productos asociados en detalle_ventas.</p>
+                      ) : (
+                        itemsVenta.map((item, idx) => (
+                          <div key={item.id || idx} className="flex justify-between items-center text-xs">
+                            <span className="text-gray-700 font-medium">
+                              {item.cantidad ?? 1}x {item.nombre_producto ?? item.producto_nombre ?? 'Producto sin nombre'}
+                            </span>
+                            <span className="text-gray-500 font-semibold">
+                              ${((item.precio_unitario || 0) * (item.cantidad || 1)).toLocaleString()}
+                            </span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>

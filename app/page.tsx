@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Sparkles, PackageSearch, ShoppingBag, DollarSign, Store, ArrowRight, LogOut, Users, TrendingUp } from 'lucide-react'
+import { Sparkles, PackageSearch, ShoppingBag, DollarSign, Store, ArrowRight, LogOut, Users, TrendingUp, BookUser } from 'lucide-react'
 
 export default function Home() {
   const [rol, setRol] = useState<string | null>(null)
@@ -144,21 +144,41 @@ export default function Home() {
           </div>
         </Link>
 
-        {/* Inventario */}
+        {/* Inventario (COLORIDO) */}
         {esSuperAdminOrAdmin && (
           <Link
             href="/inventario"
-            className="group relative bg-white border border-slate-200/80 text-slate-800 p-5 rounded-3xl shadow-sm flex flex-col justify-between h-44 active:scale-95 transition-all hover:border-slate-300 hover:shadow-md"
+            className="group relative bg-gradient-to-br from-amber-500 to-orange-600 text-white p-5 rounded-3xl shadow-md shadow-amber-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-amber-500/30 overflow-hidden"
           >
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
             <div className="flex justify-between items-start">
-              <div className="p-3 bg-slate-100 text-slate-700 rounded-2xl group-hover:bg-slate-800 group-hover:text-white transition-colors">
+              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
                 <PackageSearch size={26} />
               </div>
-              <ArrowRight size={18} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
             </div>
             <div>
-              <h2 className="font-bold text-xl leading-tight text-slate-900">Inventario</h2>
-              <p className="text-xs text-slate-500 font-medium mt-1">Control de stock y reingreso</p>
+              <h2 className="font-bold text-xl leading-tight">Inventario</h2>
+              <p className="text-xs text-amber-100 font-medium mt-1">Control de stock y reingreso</p>
+            </div>
+          </Link>
+        )}
+
+        {/* Cuentas Corrientes */}
+        {puedeVerCaja && (
+          <Link
+            href="/cuentas-corrientes"
+            className="group relative bg-gradient-to-br from-indigo-600 to-violet-600 text-white p-5 rounded-3xl shadow-md shadow-indigo-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-indigo-500/30 overflow-hidden"
+          >
+            <div className="flex justify-between items-start">
+              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
+                <BookUser size={26} />
+              </div>
+              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
+            </div>
+            <div>
+              <h2 className="font-bold text-xl leading-tight">Cuentas Corrientes</h2>
+              <p className="text-xs text-indigo-100 font-medium mt-1">Fiados, deudores y pagos</p>
             </div>
           </Link>
         )}
@@ -182,21 +202,22 @@ export default function Home() {
           </Link>
         )}
 
-        {/* Caja del Día */}
+        {/* Caja del Día (COLORIDO) */}
         {puedeVerCaja && (
           <Link
             href="/caja"
-            className="group relative bg-white border border-slate-200/80 text-slate-800 p-5 rounded-3xl shadow-sm flex flex-col justify-between h-44 active:scale-95 transition-all hover:border-slate-300 hover:shadow-md"
+            className="group relative bg-gradient-to-br from-emerald-600 to-teal-600 text-white p-5 rounded-3xl shadow-md shadow-emerald-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-emerald-500/30 overflow-hidden"
           >
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
             <div className="flex justify-between items-start">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
                 <DollarSign size={26} />
               </div>
-              <ArrowRight size={18} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
             </div>
             <div>
-              <h2 className="font-bold text-xl leading-tight text-slate-900">Caja del Día</h2>
-              <p className="text-xs text-slate-500 font-medium mt-1">Totales, arqueo y cierres</p>
+              <h2 className="font-bold text-xl leading-tight">Caja del Día</h2>
+              <p className="text-xs text-emerald-100 font-medium mt-1">Totales, arqueo y cierres</p>
             </div>
           </Link>
         )}

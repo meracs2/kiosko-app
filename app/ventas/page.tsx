@@ -28,7 +28,6 @@ export default function VentasPage() {
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
   const [kioskoId, setKioskoId] = useState<string | null>(null)
   
-  // Estados para montos de pago dividido
   const [pagoEfectivo, setPagoEfectivo] = useState('')
   const [pagoTarjeta, setPagoTarjeta] = useState('')
   const [pagoTransf, setPagoTransf] = useState('')
@@ -181,7 +180,7 @@ export default function VentasPage() {
     else if (valTarjeta > 0 && valEfectivo === 0 && valTransf === 0) metodoFinal = 'tarjeta'
     else if (valTransf > 0 && valEfectivo === 0 && valTarjeta === 0) metodoFinal = 'transferencia'
 
-    const { data: venta, error: errVenta } = await supabase
+    const { data: ventaInsertada, error: errVenta } = await supabase
       .from('ventas')
       .insert([{
         kiosko_id: kioskoId,
@@ -191,31 +190,40 @@ export default function VentasPage() {
         pago_tarjeta: valTarjeta,
         pago_transferencia: valTransf
       }])
-      .select()
-      .single()
+      .select('id')
 
-    if (errVenta || !venta) {
-      setMensaje('Error al procesar cobro: ' + errVenta?.message)
+    if (errVenta || !ventaInsertada || ventaInsertada.length === 0) {
+      setMensaje('Error al procesar cobro: ' + (errVenta?.message || 'No se pudo obtener el ID de venta'))
       setCargando(false)
       return
     }
 
-    for (const item of carrito) {
-      await supabase.from('detalle_ventas').insert([
-        {
-          venta_id: venta.id,
-          producto_id: item.esPromo ? null : item.id,
-          nombre_producto: item.esPromo ? `[PROMO] ${item.nombre}` : item.nombre,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-        },
-      ])
+    const ventaId = ventaInsertada[0].id
 
-      if (!item.esPromo) {
+    for (const item of carrito) {
+      const idLimpio = item.esPromo ? null : parseInt(String(item.id), 10)
+
+      const detalleData = {
+        venta_id: ventaId,
+        producto_id: isNaN(idLimpio as number) ? null : idLimpio,
+        nombre_producto: item.esPromo ? `[PROMO] ${item.nombre}` : item.nombre,
+        cantidad: Number(item.cantidad),
+        precio_unitario: Number(item.precio),
+      }
+
+      const { error: errDetalle } = await supabase.from('detalle_ventas').insert([detalleData])
+
+      if (errDetalle) {
+        setMensaje(`Error en detalle: ${errDetalle.message || 'Revisá la consola'}`)
+        setCargando(false)
+        return
+      }
+
+      if (!item.esPromo && idLimpio !== null) {
         const { data: productoActual } = await supabase
           .from('productos')
           .select('stock_actual')
-          .eq('id', String(item.id))
+          .eq('id', idLimpio)
           .eq('kiosko_id', kioskoId)
           .single()
 
@@ -226,7 +234,7 @@ export default function VentasPage() {
           await supabase
             .from('productos')
             .update({ stock_actual: nuevoStock >= 0 ? nuevoStock : 0 })
-            .eq('id', String(item.id))
+            .eq('id', idLimpio)
             .eq('kiosko_id', kioskoId)
         }
       }
@@ -260,7 +268,7 @@ export default function VentasPage() {
       {mensaje && (
         <div
           className={`p-3 mb-4 rounded text-sm font-medium ${
-            mensaje.includes('Error') || mensaje.includes('no encontrado')
+            mensaje.includes('Error') || mensaje.includes('no encontrado') || mensaje.includes('detalle')
               ? 'bg-red-100 text-red-700'
               : 'bg-green-100 text-green-700'
           }`}
@@ -269,7 +277,6 @@ export default function VentasPage() {
         </div>
       )}
 
-      {/* Barra de búsqueda unificada */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-4 relative">
         <label className="block text-xs font-semibold text-gray-600 mb-1">
           Buscar por Nombre, Código de Barras o QR
@@ -324,7 +331,6 @@ export default function VentasPage() {
         )}
       </div>
 
-      {/* Carrito de Compras */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
         <div className="flex justify-between items-center border-b pb-2 mb-3">
           <h2 className="font-bold text-gray-700 text-sm flex items-center gap-2">
@@ -385,7 +391,6 @@ export default function VentasPage() {
         )}
       </div>
 
-      {/* Sección de Pagos Mixtos y Cobro */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
@@ -477,7 +482,6 @@ export default function VentasPage() {
         </button>
       </div>
 
-      {/* MODAL DEL ESCÁNER DE CÁMARA */}
       {mostrarEscaner && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-xl">

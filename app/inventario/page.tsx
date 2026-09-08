@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { Camera, Plus, Trash2, ArrowLeft, Search, PackagePlus, AlertTriangle, X, Edit2 } from 'lucide-react'
+import { Camera, Plus, Trash2, ArrowLeft, Search, AlertTriangle, X, Edit2, Check } from 'lucide-react'
 
 interface Producto {
   id: string
@@ -26,7 +26,6 @@ const CATEGORIAS = [
 
 export default function InventarioPage() {
   const [productos, setProductos] = useState<Producto[]>([])
-  const [modo, setModo] = useState<'nuevo' | 'restock'>('nuevo')
   const [kioskoId, setKioskoId] = useState<string | null>(null)
   
   const [nombre, setNombre] = useState('')
@@ -42,6 +41,11 @@ export default function InventarioPage() {
   const [mensaje, setMensaje] = useState('')
 
   const [cerrarAlertaStock, setCerrarAlertaStock] = useState(false)
+
+  // ESTADOS PARA EL MODAL DE EDICIÓN SIMULTÁNEA
+  const [productoEditando, setProductoEditando] = useState<Producto | null>(null)
+  const [editPrecio, setEditPrecio] = useState('')
+  const [editStock, setEditStock] = useState('')
 
   const fetchProductos = async (idKiosko: string) => {
     const { data } = await supabase
@@ -107,37 +111,6 @@ export default function InventarioPage() {
     }
   }
 
-  const reponerStock = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!kioskoId) return
-
-    setCargando(true)
-    setMensaje('')
-
-    const productoTarget = productos.find((p) => p.codigo_barras === codigoBarras)
-    if (!productoTarget) {
-      setMensaje('Error: No se encontró ningún producto con ese código.')
-      setCargando(false)
-      return
-    }
-
-    const nuevoStock = productoTarget.stock_actual + parseInt(stock)
-    const { error } = await supabase
-      .from('productos')
-      .update({ stock_actual: nuevoStock })
-      .eq('id', productoTarget.id)
-      .eq('kiosko_id', kioskoId)
-
-    setCargando(false)
-    if (error) {
-      setMensaje('Error al reponer stock: ' + error.message)
-    } else {
-      setMensaje(`¡Se sumaron ${stock} unidades a ${productoTarget.nombre}! Total: ${nuevoStock}`)
-      limpiarFormulario()
-      fetchProductos(kioskoId)
-    }
-  }
-
   const limpiarFormulario = () => {
     setNombre('')
     setCodigoBarras('')
@@ -146,23 +119,23 @@ export default function InventarioPage() {
     setCategoria('Bebidas')
   }
 
-  // FUNCIÓN DE EDICIÓN COMPLETA DIRECTA (Precio y Stock)
-  const editarProductoCompleto = async (prod: Producto) => {
-    if (!kioskoId) return
+  // ABRIR MODAL DE EDICIÓN
+  const abrirModalEdicion = (prod: Producto) => {
+    setProductoEditando(prod)
+    setEditPrecio(prod.precio.toString())
+    setEditStock(prod.stock_actual.toString())
+  }
 
-    const nuevoPrecioStr = prompt(`Actualizar precio para "${prod.nombre}" (Actual: $${prod.precio}):`, prod.precio.toString())
-    if (nuevoPrecioStr === null) return
-    const nuevoPrecio = parseFloat(nuevoPrecioStr)
-    if (isNaN(nuevoPrecio)) {
-      alert('El precio ingresado no es válido.')
-      return
-    }
+  // GUARDAR CAMBIOS DESDE EL MODAL
+  const guardarEdicionModal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!kioskoId || !productoEditando) return
 
-    const nuevoStockStr = prompt(`Actualizar stock para "${prod.nombre}" (Actual: ${prod.stock_actual} un.):`, prod.stock_actual.toString())
-    if (nuevoStockStr === null) return
-    const nuevoStock = parseInt(nuevoStockStr)
-    if (isNaN(nuevoStock)) {
-      alert('El stock ingresado no es válido.')
+    const nuevoPrecio = parseFloat(editPrecio)
+    const nuevoStock = parseInt(editStock)
+
+    if (isNaN(nuevoPrecio) || isNaN(nuevoStock)) {
+      alert('Por favor, ingresá valores válidos.')
       return
     }
 
@@ -172,12 +145,13 @@ export default function InventarioPage() {
         precio: nuevoPrecio,
         stock_actual: nuevoStock 
       })
-      .eq('id', prod.id)
+      .eq('id', productoEditando.id)
       .eq('kiosko_id', kioskoId)
 
     if (error) {
-      alert('Error al actualizar el producto: ' + error.message)
+      alert('Error al actualizar: ' + error.message)
     } else {
+      setProductoEditando(null)
       fetchProductos(kioskoId)
     }
   }
@@ -195,7 +169,6 @@ export default function InventarioPage() {
     fetchProductos(kioskoId)
   }
 
-  // LÍMITE DE STOCK BAJO FIJADO EN <= 2
   const productosFiltrados = productos.filter((p) => {
     const coincideTexto =
       p.nombre.toLowerCase().includes(busquedaStock.toLowerCase()) ||
@@ -264,175 +237,99 @@ export default function InventarioPage() {
         </div>
       )}
 
-      <div className="flex bg-gray-200 p-1 rounded-xl mb-4 text-xs font-bold">
-        <button
-          onClick={() => { setModo('nuevo'); limpiarFormulario(); setMensaje(''); }}
-          className={`flex-1 py-2.5 rounded-lg transition flex items-center justify-center gap-1.5 ${
-            modo === 'nuevo' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'
-          }`}
-        >
-          <Plus size={16} /> Crear Producto
-        </button>
-        <button
-          onClick={() => { setModo('restock'); limpiarFormulario(); setMensaje(''); }}
-          className={`flex-1 py-2.5 rounded-lg transition flex items-center justify-center gap-1.5 ${
-            modo === 'restock' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600'
-          }`}
-        >
-          <PackagePlus size={16} /> Reponer Stock
-        </button>
-      </div>
-
-      {modo === 'nuevo' && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Cargar Producto Nuevo</h2>
-          
-          <form onSubmit={guardarProductoNuevo} className="space-y-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Código de Barras</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={codigoBarras}
-                  onChange={(e) => setCodigoBarras(e.target.value)}
-                  placeholder="Escaneá o tipeá el código"
-                  required
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarEscaner(true)}
-                  className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-blue-700 transition"
-                >
-                  <Camera size={18} />
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Nombre del Producto</label>
+      {/* FORMULARIO DE CARGA DE PRODUCTO NUEVO */}
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm flex items-center gap-1.5">
+          <Plus size={16} className="text-blue-600" /> Cargar Producto Nuevo
+        </h2>
+        
+        <form onSubmit={guardarProductoNuevo} className="space-y-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Código de Barras</label>
+            <div className="flex gap-2">
               <input
                 type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: Coca Cola 2.25L"
+                value={codigoBarras}
+                onChange={(e) => setCodigoBarras(e.target.value)}
+                placeholder="Escaneá o tipeá el código"
+                required
+                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarEscaner(true)}
+                className="bg-blue-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-blue-700 transition"
+              >
+                <Camera size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Nombre del Producto</label>
+            <input
+              type="text"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej: Coca Cola 2.25L"
+              required
+              className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1 font-semibold">Categoría</label>
+            <select
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+              className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {CATEGORIAS.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Precio ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={precio}
+                onChange={(e) => setPrecio(e.target.value)}
+                placeholder="0.00"
                 required
                 className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
               />
             </div>
-
             <div>
-              <label className="block text-xs text-gray-500 mb-1 font-semibold">Categoría</label>
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {CATEGORIAS.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Precio ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={precio}
-                  onChange={(e) => setPrecio(e.target.value)}
-                  placeholder="0.00"
-                  required
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Stock Inicial</label>
-                <input
-                  type="number"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="10"
-                  required
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={cargando}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
-            >
-              <Plus size={18} />
-              {cargando ? 'Guardando...' : 'Guardar Producto'}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {modo === 'restock' && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Reponer Stock</h2>
-          <form onSubmit={reponerStock} className="space-y-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Código de Barras</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={codigoBarras}
-                  onChange={(e) => {
-                    setCodigoBarras(e.target.value)
-                    const prod = productos.find((p) => p.codigo_barras === e.target.value)
-                    if (prod) setNombre(prod.nombre)
-                  }}
-                  placeholder="Escaneá el código"
-                  required
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarEscaner(true)}
-                  className="bg-emerald-600 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 hover:bg-emerald-700 transition"
-                >
-                  <Camera size={18} />
-                </button>
-              </div>
-            </div>
-
-            {nombre && (
-              <div className="p-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold">
-                Producto: {nombre}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Unidades a ingresar</label>
+              <label className="block text-xs text-gray-500 mb-1">Stock Inicial</label>
               <input
                 type="number"
                 value={stock}
                 onChange={(e) => setStock(e.target.value)}
-                placeholder="Ej: 12"
+                placeholder="10"
                 required
                 className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
               />
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={cargando}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
-            >
-              <PackagePlus size={18} />
-              {cargando ? 'Sumando...' : 'Sumar al Stock'}
-            </button>
-          </form>
-        </div>
-      )}
+          <button
+            type="submit"
+            disabled={cargando}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
+          >
+            <Plus size={18} />
+            {cargando ? 'Guardando...' : 'Guardar Producto'}
+          </button>
+        </form>
+      </div>
 
+      {/* LISTA DE STOCK */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Lista de Stock</h2>
 
@@ -474,7 +371,7 @@ export default function InventarioPage() {
             Sin resultados para este filtro.
           </p>
         ) : (
-          <div className="divide-y max-h-80 overflow-y-auto">
+          <div className="divide-y max-h-96 overflow-y-auto">
             {productosFiltrados.map((prod) => {
               const esStockBajo = prod.stock_actual <= 2
               return (
@@ -500,11 +397,11 @@ export default function InventarioPage() {
                   <div className="flex items-center gap-2.5">
                     <span className="font-bold text-green-600 text-sm">${prod.precio}</span>
                     
-                    {/* BOTÓN ÚNICO DE EDICIÓN (PRECIO Y STOCK) */}
+                    {/* BOTÓN PARA ABRIR MODAL DE EDICIÓN */}
                     <button
-                      onClick={() => editarProductoCompleto(prod)}
+                      onClick={() => abrirModalEdicion(prod)}
                       className="bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
-                      title="Editar precio y stock"
+                      title="Modificar precio y stock"
                     >
                       <Edit2 size={13} /> Editar
                     </button>
@@ -523,6 +420,68 @@ export default function InventarioPage() {
         )}
       </div>
 
+      {/* MODAL DE EDICIÓN SIMULTÁNEA DE PRECIO Y STOCK */}
+      {productoEditando && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 relative shadow-2xl border border-gray-100">
+            <div className="flex justify-between items-center mb-3 border-b pb-2">
+              <div>
+                <h3 className="font-bold text-gray-800 text-base">Editar Producto</h3>
+                <p className="text-xs text-gray-500 truncate max-w-[240px]">{productoEditando.nombre}</p>
+              </div>
+              <button
+                onClick={() => setProductoEditando(null)}
+                className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={guardarEdicionModal} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Nuevo Precio ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editPrecio}
+                  onChange={(e) => setEditPrecio(e.target.value)}
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-gray-50 text-gray-800 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Nuevo Stock (unidades)</label>
+                <input
+                  type="number"
+                  value={editStock}
+                  onChange={(e) => setEditStock(e.target.value)}
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-gray-50 text-gray-800 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setProductoEditando(null)}
+                  className="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-sm transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-1.5 shadow-md"
+                >
+                  <Check size={16} /> Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ESCÁNER */}
       {mostrarEscaner && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-xl">
@@ -538,14 +497,7 @@ export default function InventarioPage() {
             <Scanner
               onScan={(codigoLeido) => {
                 if (!codigoLeido) return
-                const codigoLimpio = codigoLeido.trim()
-                setCodigoBarras(codigoLimpio)
-
-                if (modo === 'restock') {
-                  const prod = productos.find((p) => p.codigo_barras === codigoLimpio)
-                  if (prod) setNombre(prod.nombre)
-                }
-
+                setCodigoBarras(codigoLeido.trim())
                 setMostrarEscaner(false)
               }}
             />
