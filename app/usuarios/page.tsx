@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, UserPlus, Trash2, Edit2, X, Check, Clock } from 'lucide-react'
+import { ArrowLeft, UserPlus, Trash2, Edit2, X, Check, Clock, Users, AlertCircle } from 'lucide-react'
 
 export default function UsuariosPage() {
   const [email, setEmail] = useState('')
@@ -128,110 +128,123 @@ export default function UsuariosPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="p-2.5 bg-white border shadow-sm hover:bg-gray-100 text-gray-700 rounded-xl active:scale-95 transition flex items-center justify-center shrink-0">
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-8 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
+      
+      {/* HEADER GENERAL */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-white p-5 rounded-2xl shadow-xs border border-slate-100">
+        <div className="flex items-center gap-3.5">
+          <Link 
+            href="/" 
+            className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all active:scale-95 flex items-center justify-center shrink-0 border border-slate-200"
+          >
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 leading-tight">Personal</h1>
-            <p className="text-xs text-gray-500">Gestión de accesos, roles y turnos</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+              <Users className="text-blue-600" size={26} /> Personal y Accesos
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Gestión de accesos, roles y turnos de empleados</p>
           </div>
         </div>
+
+        <button
+          onClick={() => { setMostrarFormulario(!mostrarFormulario); setMensaje(''); }}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 active:scale-95 shadow-xs ${
+            mostrarFormulario 
+              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          <UserPlus size={18} /> {mostrarFormulario ? 'Ocultar Formulario' : 'Registrar Nuevo Usuario'}
+        </button>
       </div>
 
       {mensaje && (
         <div
-          className={`p-3 mb-4 rounded text-sm ${
-            mensaje.includes('Error') || mensaje.includes('❌') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          className={`p-4 mb-6 rounded-xl text-sm font-medium flex items-center gap-2.5 border shadow-xs ${
+            mensaje.includes('Error') || mensaje.includes('❌') 
+              ? 'bg-red-50 text-red-700 border-red-100' 
+              : 'bg-emerald-50 text-emerald-700 border-emerald-100'
           }`}
         >
+          <AlertCircle size={18} className="shrink-0" />
           {mensaje}
         </div>
       )}
 
-      <div className="flex bg-gray-200 p-1 rounded-xl mb-4 text-xs font-bold">
-        <button
-          onClick={() => { setMostrarFormulario(!mostrarFormulario); setMensaje(''); }}
-          className={`w-full py-2.5 rounded-lg transition flex items-center justify-center gap-1.5 ${
-            mostrarFormulario ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-700 shadow-sm'
-          }`}
-        >
-          <UserPlus size={16} /> {mostrarFormulario ? 'Ocultar Formulario' : 'Registrar Nuevo Usuario'}
-        </button>
-      </div>
-
+      {/* FORMULARIO DE REGISTRO */}
       {mostrarFormulario && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Cargar Usuario Nuevo</h2>
+        <div className="bg-white rounded-2xl shadow-xs p-6 md:p-8 max-w-xl mx-auto mb-8 border border-slate-100 animate-fadeIn">
+          <h2 className="font-bold text-slate-900 mb-5 border-b border-slate-100 pb-3 text-base flex items-center gap-2">
+            <UserPlus size={18} className="text-blue-600" /> Cargar Usuario Nuevo
+          </h2>
           
-          <form onSubmit={handleCrearUsuario} className="space-y-3">
+          <form onSubmit={handleCrearUsuario} className="space-y-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Nombre Completo</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre Completo</label>
               <input
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Ej: Juan Pérez"
                 required
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Email / Usuario</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Email / Usuario</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="usuario@kiosko.com"
                 required
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Contraseña Inicial</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Contraseña Inicial</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1 font-semibold">Rol</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Rol de Sistema</label>
               <select
                 value={rol}
                 onChange={(e) => setRol(e.target.value)}
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               >
-                <option value="empleado">empleado</option>
-                <option value="admin">admin</option>
+                <option value="empleado">Empleado</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1 font-semibold">Hora Entrada</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Hora Entrada</label>
                 <input
                   type="time"
                   value={horaInicio}
                   onChange={(e) => setHoraInicio(e.target.value)}
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1 font-semibold">Hora Salida</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Hora Salida</label>
                 <input
                   type="time"
                   value={horaFin}
                   onChange={(e) => setHoraFin(e.target.value)}
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
                 />
               </div>
             </div>
@@ -239,7 +252,7 @@ export default function UsuariosPage() {
             <button
               type="submit"
               disabled={cargando}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 mt-3 shadow-xs active:scale-95 text-sm"
             >
               <UserPlus size={18} />
               {cargando ? 'Guardando...' : 'Guardar Usuario'}
@@ -248,103 +261,121 @@ export default function UsuariosPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Lista de Personal</h2>
+      {/* LISTA DE PERSONAL (GRILLA ADAPTABLE) */}
+      <div className="bg-white rounded-2xl shadow-xs p-6 border border-slate-100">
+        <h2 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3 text-base flex items-center gap-2">
+          <Users size={18} className="text-slate-600" /> Lista de Personal Registrado
+        </h2>
 
         {usuarios.length === 0 ? (
-          <p className="text-center text-gray-400 py-4 text-sm">
-            No hay usuarios registrados.
-          </p>
+          <div className="py-12 text-center">
+            <Users className="mx-auto text-slate-300 mb-2" size={42} />
+            <p className="text-sm font-medium text-slate-700">No hay usuarios registrados.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Creá un nuevo usuario para asignarle turnos y accesos.</p>
+          </div>
         ) : (
-          <div className="divide-y max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {usuarios.map((u) => (
-              <div key={u.id} className="py-3 flex justify-between items-center">
+              <div key={u.id} className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between gap-4 transition-all hover:bg-slate-50">
+                
                 {usuarioEditando?.id === u.id ? (
-                  <div className="flex flex-col gap-2 w-full pr-2">
-                    <input
-                      type="email"
-                      value={usuarioEditando.email}
-                      onChange={(e) => setUsuarioEditando({ ...usuarioEditando, email: e.target.value })}
-                      className="p-1.5 border rounded-lg text-sm bg-gray-50"
-                    />
-                    <select
-                      value={usuarioEditando.rol}
-                      onChange={(e) => setUsuarioEditando({ ...usuarioEditando, rol: e.target.value })}
-                      className="p-1.5 border rounded-lg text-sm bg-gray-50"
-                    >
-                      <option value="empleado">empleado</option>
-                      <option value="admin">admin</option>
-                    </select>
+                  <div className="flex flex-col gap-2.5 w-full">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={usuarioEditando.email}
+                        onChange={(e) => setUsuarioEditando({ ...usuarioEditando, email: e.target.value })}
+                        className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Rol</label>
+                      <select
+                        value={usuarioEditando.rol}
+                        onChange={(e) => setUsuarioEditando({ ...usuarioEditando, rol: e.target.value })}
+                        className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800"
+                      >
+                        <option value="empleado">Empleado</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="time"
-                        value={usuarioEditando.hora_inicio || '08:00'}
-                        onChange={(e) => setUsuarioEditando({ ...usuarioEditando, hora_inicio: e.target.value })}
-                        className="p-1.5 border rounded-lg text-xs bg-gray-50"
-                      />
-                      <input
-                        type="time"
-                        value={usuarioEditando.hora_fin || '17:00'}
-                        onChange={(e) => setUsuarioEditando({ ...usuarioEditando, hora_fin: e.target.value })}
-                        className="p-1.5 border rounded-lg text-xs bg-gray-50"
-                      />
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Entrada</label>
+                        <input
+                          type="time"
+                          value={usuarioEditando.hora_inicio || '08:00'}
+                          onChange={(e) => setUsuarioEditando({ ...usuarioEditando, hora_inicio: e.target.value })}
+                          className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Salida</label>
+                        <input
+                          type="time"
+                          value={usuarioEditando.hora_fin || '17:00'}
+                          onChange={(e) => setUsuarioEditando({ ...usuarioEditando, hora_fin: e.target.value })}
+                          className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800"
+                        />
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-800 text-sm">{u.email}</p>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-xs px-2 py-0.5 rounded font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
+                  <div className="overflow-hidden">
+                    <p className="font-bold text-slate-900 text-sm truncate" title={u.email}>{u.email}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-lg font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
                         {u.rol || 'empleado'}
                       </span>
                       {u.hora_inicio && u.hora_fin && (
-                        <span className="text-xs px-2 py-0.5 rounded font-medium bg-gray-100 text-gray-600 flex items-center gap-1">
-                          <Clock size={12} /> {u.hora_inicio} a {u.hora_fin} hs
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-lg font-semibold bg-white text-slate-600 flex items-center gap-1 border border-slate-200/60 shadow-xs">
+                          <Clock size={12} className="text-slate-400" /> {u.hora_inicio} a {u.hora_fin} hs
                         </span>
                       )}
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 shrink-0">
+                {/* BOTONES DE ACCIÓN */}
+                <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/60">
                   {usuarioEditando?.id === u.id ? (
                     <>
                       <button
                         onClick={handleGuardarEdicion}
-                        className="p-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition"
+                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition flex items-center gap-1 text-xs font-bold shadow-xs"
                         title="Confirmar"
                       >
-                        <Check size={16} />
+                        <Check size={14} /> Guardar
                       </button>
                       <button
                         onClick={() => setUsuarioEditando(null)}
-                        className="p-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                        className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-xl hover:bg-slate-300 transition flex items-center gap-1 text-xs font-bold"
                         title="Cancelar"
                       >
-                        <X size={16} />
+                        <X size={14} /> Cancelar
                       </button>
                     </>
                   ) : (
                     <>
                       <button
                         onClick={() => setUsuarioEditando(u)}
-                        className="p-2 bg-gray-50 text-gray-600 hover:text-blue-600 rounded-lg border shadow-xs transition"
+                        className="p-2 bg-white text-slate-600 hover:text-blue-600 rounded-xl border border-slate-200/60 shadow-xs transition hover:bg-slate-50"
                         title="Editar"
                       >
-                        <Edit2 size={16} />
+                        <Edit2 size={15} />
                       </button>
                       <button
                         onClick={() => handleEliminarUsuario(u.id)}
-                        className="p-2 bg-gray-50 text-rose-500 hover:text-rose-700 rounded-lg border shadow-xs transition"
+                        className="p-2 bg-white text-rose-500 hover:text-rose-700 rounded-xl border border-slate-200/60 shadow-xs transition hover:bg-rose-50"
                         title="Eliminar"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                       </button>
                     </>
                   )}
                 </div>
+
               </div>
             ))}
           </div>

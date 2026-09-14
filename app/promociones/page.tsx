@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Tag, Edit2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Tag, Edit2, Sparkles, AlertCircle } from 'lucide-react'
 
 // Interfaces basadas en la base de datos
 interface Promocion {
@@ -96,7 +96,7 @@ export default function PromocionesPage() {
     if (!kioskoId) return
 
     const nuevoPrecioStr = prompt(`Actualizar precio para "${promo.nombre}" (Actual: $${promo.precio}):`, promo.precio.toString())
-    if (nuevoPrecioStr === null) return // Si cancela, no hace nada
+    if (nuevoPrecioStr === null) return
     
     const nuevoPrecio = parseFloat(nuevoPrecioStr)
     if (isNaN(nuevoPrecio)) {
@@ -142,119 +142,135 @@ export default function PromocionesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-4 max-w-lg mx-auto pb-12">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-8 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
+      
+      {/* HEADER GENERAL */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-white p-5 rounded-2xl shadow-xs border border-slate-100">
+        <div className="flex items-center gap-3.5">
           <Link
             href="/"
-            className="p-2.5 bg-white border shadow-sm hover:bg-gray-100 text-gray-700 rounded-xl active:scale-95 transition flex items-center justify-center shrink-0"
+            className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all active:scale-95 flex items-center justify-center shrink-0 border border-slate-200"
           >
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 leading-tight">Promociones</h1>
-            <p className="text-xs text-gray-500">Combos y ofertas vigentes</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+              <Sparkles className="text-blue-600" size={26} /> Promociones
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Combos y ofertas vigentes para tus clientes</p>
           </div>
         </div>
 
         {modo === 'lista' && (
           <button
             onClick={() => { setModo('nuevo'); limpiarFormulario(); }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 active:scale-95 transition shrink-0"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xs shrink-0"
           >
-            <Plus size={16} /> Nueva Promo
+            <Plus size={18} /> Nueva Promo
           </button>
         )}
       </div>
 
       {mensaje && (
         <div
-          className={`p-3 mb-4 rounded text-sm ${
-            mensaje.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          className={`p-4 mb-6 rounded-xl text-sm font-medium flex items-center gap-2.5 border shadow-xs ${
+            mensaje.includes('Error') 
+              ? 'bg-red-50 text-red-700 border-red-100' 
+              : 'bg-emerald-50 text-emerald-700 border-emerald-100'
           }`}
         >
+          <AlertCircle size={18} className="shrink-0" />
           {mensaje}
         </div>
       )}
 
-      {/* Modo 1: Lista de Promociones Cargadas */}
+      {/* MODO 1: LISTA DE PROMOCIONES (GRILLA ADAPTABLE) */}
       {modo === 'lista' && (
-        <div className="space-y-4">
+        <div>
           {cargando ? (
-            <p className="text-center text-gray-400 py-4 text-sm">Cargando promociones...</p>
+            <div className="bg-white p-12 rounded-2xl shadow-xs border border-slate-100 text-center">
+              <p className="text-sm text-slate-400 font-semibold animate-pulse">Cargando promociones...</p>
+            </div>
           ) : promociones.length === 0 ? (
-            <p className="text-center text-gray-400 py-4 text-sm">No hay promociones cargadas.</p>
+            <div className="bg-white p-12 rounded-2xl shadow-xs border border-slate-100 text-center">
+              <Sparkles className="mx-auto text-slate-300 mb-2" size={42} />
+              <p className="text-sm font-medium text-slate-700">No hay promociones cargadas todavía.</p>
+              <p className="text-xs text-slate-400 mt-0.5">Creá tu primer combo para empezar a ofrecerlo.</p>
+            </div>
           ) : (
-            promociones.map((promo) => (
-              <div key={promo.id} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                <div className="flex justify-between items-start mb-3 pb-2 border-b">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {promociones.map((promo) => (
+                <div key={promo.id} className="bg-white rounded-2xl shadow-xs p-5 border border-slate-100 flex flex-col justify-between transition-all hover:shadow-md">
                   <div>
-                    <h3 className="font-bold text-gray-800 text-base">{promo.nombre}</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">{promo.descripcion}</p>
+                    <div className="flex justify-between items-start mb-2.5 pb-2.5 border-b border-slate-100 gap-3">
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-base leading-snug">{promo.nombre}</h3>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{promo.descripcion || 'Sin descripción detallada.'}</p>
+                      </div>
+                      <button
+                        onClick={() => eliminarPromocion(promo.id)}
+                        className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0"
+                        title="Eliminar promoción"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => eliminarPromocion(promo.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
 
-                <div className="flex justify-between items-center text-xs text-gray-600 mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <Tag size={14} className="text-blue-600" />
-                      <span className="font-bold text-gray-800 text-sm">${promo.precio.toLocaleString()}</span>
+                  <div className="flex justify-between items-center pt-2">
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                      <Tag size={15} className="text-blue-600" />
+                      <span className="font-extrabold text-slate-900 text-sm">${promo.precio.toLocaleString()}</span>
                     </div>
 
-                    {/* BOTÓN DE EDICIÓN RÁPIDA DE PRECIO */}
                     <button
                       onClick={() => editarPrecioPromo(promo)}
-                      className="bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                      className="bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-200/60 shadow-xs"
                       title="Editar precio"
                     >
-                      <Edit2 size={12} /> Editar
+                      <Edit2 size={13} /> Editar Precio
                     </button>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       )}
 
-      {/* Modo 2: Cargar Nueva Promoción */}
+      {/* MODO 2: CARGAR NUEVA PROMOCIÓN */}
       {modo === 'nuevo' && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <h2 className="font-bold text-gray-700 mb-3 border-b pb-2 text-sm">Cargar Promoción Nueva</h2>
+        <div className="bg-white rounded-2xl shadow-xs p-6 md:p-8 max-w-xl mx-auto border border-slate-100">
+          <h2 className="font-bold text-slate-900 mb-5 border-b border-slate-100 pb-3 text-base flex items-center gap-2">
+            <Sparkles size={18} className="text-blue-600" /> Cargar Promoción Nueva
+          </h2>
           
-          <form onSubmit={guardarPromocion} className="space-y-3">
+          <form onSubmit={guardarPromocion} className="space-y-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Nombre (Ej: Combo Fernet)</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre (Ej: Combo Fernet)</label>
               <input
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Ej: Promo Fernet con Coca, Combo Burger Completa"
                 required
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Descripción (Ej: 1 Fernet + 2 Coca 1.5L)</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Descripción (Ej: 1 Fernet + 2 Coca 1.5L)</label>
               <input
                 type="text"
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                placeholder="Ej: 1 botella Fernet 750ml + 2 Coca Cola 1.5L, Incluye papas y gaseosa"
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                placeholder="Ej: 1 botella Fernet 750ml + 2 Coca Cola 1.5L"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Precio del Combo ($)</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Precio del Combo ($)</label>
               <input
                 type="number"
                 step="0.01"
@@ -262,25 +278,27 @@ export default function PromocionesPage() {
                 onChange={(e) => setPrecio(e.target.value)}
                 placeholder="Ej: 15000.00"
                 required
-                className="w-full p-2.5 border rounded-lg bg-gray-50 text-gray-800 text-sm"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={cargando}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-2"
-            >
-              <Plus size={18} />
-              {cargando ? 'Guardando...' : 'Guardar Promoción'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setModo('lista')}
-              className="w-full bg-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium transition active:scale-95 mt-1"
-            >
-              Cancelar
-            </button>
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                type="submit"
+                disabled={cargando}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-xs active:scale-95 text-sm"
+              >
+                <Plus size={18} />
+                {cargando ? 'Guardando...' : 'Guardar Promoción'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setModo('lista')}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl text-sm font-bold transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+            </div>
           </form>
         </div>
       )}

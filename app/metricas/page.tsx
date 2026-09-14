@@ -42,6 +42,7 @@ export default function MetricasPage() {
         fechaDesde.setDate(ahora.getDate() - 30)
       }
 
+      // IMPORTANTE: Asegurate de filtrar también por kiosko_id si tu tabla detalle_ventas es multi-tenant
       const { data, error } = await supabase
         .from('detalle_ventas')
         .select('producto_nombre, cantidad, created_at')
@@ -84,49 +85,57 @@ export default function MetricasPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 sm:p-6 max-w-2xl mx-auto pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="p-2 bg-white rounded-xl shadow-sm text-slate-600 hover:bg-slate-100">
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-8 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
+      
+      {/* HEADER GENERAL */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-white p-5 rounded-2xl shadow-xs border border-slate-100">
+        <div className="flex items-center gap-3.5">
+          <Link 
+            href="/" 
+            className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all active:scale-95 flex items-center justify-center shrink-0 border border-slate-200"
+          >
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Métricas y Salida</h1>
-            <p className="text-xs text-slate-500 font-medium">Análisis visual de rotación de productos</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+              <BarChart3 className="text-blue-600" size={26} /> Métricas y Salida
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Análisis visual de rotación de productos y ventas</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* ACCIONES SUPERIORES (Excel y Filtros de Período) */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={exportarAExcel}
             disabled={dataGraficos.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-sm transition"
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95"
           >
-            <Download size={14} />
-            Excel
+            <Download size={15} />
+            Exportar Excel
           </button>
 
-          <div className="flex bg-slate-200/60 p-1 rounded-2xl gap-1">
+          <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200/60">
             <button
               onClick={() => setPeriodo('hoy')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                periodo === 'hoy' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all shadow-xs ${
+                periodo === 'hoy' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Hoy
             </button>
             <button
               onClick={() => setPeriodo('semana')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                periodo === 'semana' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all shadow-xs ${
+                periodo === 'semana' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               7 días
             </button>
             <button
               onClick={() => setPeriodo('mes')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                periodo === 'mes' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all shadow-xs ${
+                periodo === 'mes' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               30 días
@@ -135,72 +144,86 @@ export default function MetricasPage() {
         </div>
       </div>
 
+      {/* CONTENIDO PRINCIPAL */}
       {cargando ? (
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center">
+        <div className="bg-white p-12 rounded-2xl shadow-xs border border-slate-100 text-center">
           <p className="text-sm text-slate-400 font-semibold animate-pulse">Cargando métricas del sistema...</p>
         </div>
       ) : dataGraficos.length === 0 ? (
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center">
-          <p className="text-sm text-slate-500">No hay ventas registradas en el período seleccionado.</p>
+        <div className="bg-white p-12 rounded-2xl shadow-xs border border-slate-100 text-center">
+          <BarChart3 className="mx-auto text-slate-300 mb-2" size={42} />
+          <p className="text-sm font-medium text-slate-700">No hay ventas registradas en el período seleccionado.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Probá cambiando el filtro de tiempo a 30 días.</p>
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-4 text-blue-600">
-              <BarChart3 size={20} />
-              <h2 className="font-bold text-lg text-slate-800">Top Unidades Vendidas</h2>
+          
+          {/* GRILLA SUPERIOR: 2 COLUMNAS PARA GRÁFICOS EN ESCRITORIO */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Gráfico de Barras */}
+            <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100">
+              <div className="flex items-center gap-2 mb-4 text-blue-600 pb-2 border-b border-slate-100">
+                <BarChart3 size={20} />
+                <h2 className="font-bold text-base text-slate-800">Top Unidades Vendidas</h2>
+              </div>
+              <div className="h-72 w-full text-xs">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dataGraficos.slice(0, 5)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="nombre" tick={{ fill: '#64748B', fontSize: 11 }} />
+                    <YAxis tick={{ fill: '#64748B', fontSize: 11 }} />
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }} />
+                    <Bar dataKey="cantidad" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="h-64 w-full text-xs">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dataGraficos.slice(0, 5)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="nombre" tick={{ fill: '#64748B' }} />
-                  <YAxis tick={{ fill: '#64748B' }} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                  <Bar dataKey="cantidad" fill="#3B82F6" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+
+            {/* Gráfico Circular / Torta */}
+            <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100">
+              <div className="flex items-center gap-2 mb-4 text-emerald-600 pb-2 border-b border-slate-100">
+                <PieIcon size={20} />
+                <h2 className="font-bold text-base text-slate-800">Distribución de Salida (%)</h2>
+              </div>
+              <div className="h-72 w-full text-xs">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={dataGraficos.slice(0, 5)} dataKey="cantidad" nameKey="nombre" cx="50%" cy="50%" outerRadius={85} label>
+                      {dataGraficos.slice(0, 5).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORES[index % COLORES.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+
           </div>
 
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-4 text-emerald-600">
-              <PieIcon size={20} />
-              <h2 className="font-bold text-lg text-slate-800">Distribución de Salida (%)</h2>
-            </div>
-            <div className="h-64 w-full text-xs">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={dataGraficos.slice(0, 5)} dataKey="cantidad" nameKey="nombre" cx="50%" cy="50%" outerRadius={80} label>
-                    {dataGraficos.slice(0, 5).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORES[index % COLORES.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-4 text-amber-500">
+          {/* RANKING COMPLETO DEBAJO (ANCHO COMPLETO) */}
+          <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100">
+            <div className="flex items-center gap-2 mb-4 text-amber-500 pb-2 border-b border-slate-100">
               <Flame size={20} />
-              <h2 className="font-bold text-lg text-slate-800">Ranking del Período</h2>
+              <h2 className="font-bold text-base text-slate-800">Ranking Completo del Período</h2>
             </div>
-            <div className="space-y-2">
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {dataGraficos.map((prod, idx) => (
-                <div key={idx} className="flex justify-between items-center p-3 rounded-2xl bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORES[idx % COLORES.length] || '#94A3B8' }} />
-                    <span className="font-semibold text-slate-700 text-sm">{prod.nombre}</span>
+                <div key={idx} className="flex justify-between items-center p-3.5 rounded-xl bg-slate-50/80 border border-slate-100/80 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-3 truncate pr-2">
+                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: COLORES[idx % COLORES.length] || '#94A3B8' }} />
+                    <span className="font-semibold text-slate-800 text-sm truncate" title={prod.nombre}>{prod.nombre}</span>
                   </div>
-                  <span className="text-xs font-bold text-slate-600 bg-white px-3 py-1 rounded-xl shadow-sm border border-slate-100">
+                  <span className="text-xs font-black text-slate-700 bg-white px-3 py-1.5 rounded-xl shadow-xs border border-slate-200/60 shrink-0">
                     {prod.cantidad} un.
                   </span>
                 </div>
               ))}
             </div>
           </div>
+
         </div>
       )}
     </main>

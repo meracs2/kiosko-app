@@ -1,3 +1,4 @@
+// app/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -80,8 +81,8 @@ export default function Home() {
 
   if (cargando) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-sm font-semibold text-slate-500 animate-pulse">Verificando turno y permisos...</p>
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <p className="text-base font-black text-black animate-pulse">Verificando turno y permisos...</p>
       </main>
     )
   }
@@ -91,175 +92,179 @@ export default function Home() {
   const puedeVerCaja = rol === 'super_admin' || rol === 'admin' || rol === 'empleado'
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 sm:p-6 max-w-xl mx-auto flex flex-col justify-center">
-      {/* Header & Branding */}
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6 text-center relative overflow-hidden">
-        <div className="absolute top-4 right-4">
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans antialiased text-black">
+      {/* Header Estilo Escritorio (Ancho Completo) */}
+      <header className="bg-white border-b-2 border-slate-300 px-8 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="bg-blue-600 text-black p-2.5 rounded-2xl shadow-md border-2 border-blue-900">
+            <Store size={24} className="text-black" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-black tracking-tight">Kiosko POS</h1>
+            <p className="text-xs text-black font-extrabold">Gestión inteligente de ventas y stock</p>
+          </div>
+        </div>
+
+        {/* Badge de rol, estado y botón salir */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-slate-100 px-3.5 py-1.5 rounded-full border-2 border-slate-300 text-xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="text-black font-black">Operativo</span>
+            <span className="text-slate-400 font-bold">|</span>
+            <span className="text-black font-black uppercase tracking-wider">Rol: {rol || 'Cargando...'}</span>
+          </div>
+
           <button
             onClick={cerrarSesion}
             title="Cerrar Sesión"
-            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+            className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-black hover:bg-red-200 hover:text-red-950 border-2 border-slate-300 rounded-xl transition text-xs font-black shadow-2xs"
           >
-            <LogOut size={18} />
+            <LogOut size={16} />
+            Salir
           </button>
         </div>
+      </header>
 
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-4 rounded-2xl w-16 h-16 mx-auto flex items-center justify-center shadow-lg shadow-blue-500/30 mb-4 transition-transform hover:scale-105">
-          <Store size={32} />
+      {/* Grilla Principal de Escritorio (Ocupa todo el ancho disponible) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 sm:p-10 flex flex-col justify-center">
+        <div className="mb-6">
+          <h2 className="text-2xl font-black text-black tracking-tight">Panel de Control</h2>
+          <p className="text-black font-extrabold text-sm mt-0.5">Seleccioná una sección para comenzar a operar.</p>
         </div>
-        
-        <h1 className="text-3xl font-black text-slate-800 tracking-tight">Kiosko POS</h1>
-        <p className="text-slate-500 text-sm mt-1 font-medium">Gestión inteligente de ventas y stock</p>
 
-        {/* Badge de rol y estado */}
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-200/60">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Operativo
-          </div>
-          <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-            Rol: {rol || 'Cargando...'}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Punto de Venta */}
+          <Link
+            href="/ventas"
+            className="group relative bg-emerald-400 hover:bg-emerald-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-emerald-700 overflow-hidden"
+          >
+            <div className="flex justify-between items-start">
+              <div className="p-3 bg-white/40 rounded-2xl border border-emerald-600">
+                <ShoppingBag size={28} className="text-black" />
+              </div>
+              <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+            </div>
+            <div>
+              <h2 className="font-black text-2xl leading-tight text-black">Punto de Venta</h2>
+              <p className="text-xs text-black font-extrabold mt-1">Cobrar e imprimir ticket de forma rápida</p>
+            </div>
+          </Link>
+
+          {/* Inventario */}
+          {esSuperAdminOrAdmin && (
+            <Link
+              href="/inventario"
+              className="group relative bg-amber-400 hover:bg-amber-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-amber-700 overflow-hidden"
+            >
+              <div className="flex justify-between items-start">
+                <div className="p-3 bg-white/40 rounded-2xl border border-amber-600">
+                  <PackageSearch size={28} className="text-black" />
+                </div>
+                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+              </div>
+              <div>
+                <h2 className="font-black text-2xl leading-tight text-black">Inventario</h2>
+                <p className="text-xs text-black font-extrabold mt-1">Control de stock y reingreso de mercadería</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Cuentas Corrientes */}
+          {puedeVerCaja && (
+            <Link
+              href="/cuentas-corrientes"
+              className="group relative bg-indigo-400 hover:bg-indigo-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-indigo-700 overflow-hidden"
+            >
+              <div className="flex justify-between items-start">
+                <div className="p-3 bg-white/40 rounded-2xl border border-indigo-600">
+                  <BookUser size={28} className="text-black" />
+                </div>
+                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+              </div>
+              <div>
+                <h2 className="font-black text-2xl leading-tight text-black">Cuentas Corrientes</h2>
+                <p className="text-xs text-black font-extrabold mt-1">Fiados, deudores y pagos detallados</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Promociones */}
+          {esSuperAdminOrAdmin && (
+            <Link
+              href="/promociones"
+              className="group relative bg-purple-400 hover:bg-purple-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-purple-700 overflow-hidden"
+            >
+              <div className="flex justify-between items-start">
+                <div className="p-3 bg-white/40 rounded-2xl border border-purple-600">
+                  <Sparkles size={28} className="text-black" />
+                </div>
+                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+              </div>
+              <div>
+                <h2 className="font-black text-2xl leading-tight text-black">Promos</h2>
+                <p className="text-xs text-black font-extrabold mt-1">Combos Fernet, Burgers y más ofertas</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Caja del Día */}
+          {puedeVerCaja && (
+            <Link
+              href="/caja"
+              className="group relative bg-teal-400 hover:bg-teal-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-teal-700 overflow-hidden"
+            >
+              <div className="flex justify-between items-start">
+                <div className="p-3 bg-white/40 rounded-2xl border border-teal-600">
+                  <DollarSign size={28} className="text-black" />
+                </div>
+                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+              </div>
+              <div>
+                <h2 className="font-black text-2xl leading-tight text-black">Caja del Día</h2>
+                <p className="text-xs text-black font-extrabold mt-1">Totales, arqueos de caja y cierres</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Personal / Usuarios */}
+          {esSuperAdminOrAdmin && (
+            <Link
+              href="/usuarios"
+              className="group relative bg-cyan-400 hover:bg-cyan-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-cyan-700 overflow-hidden"
+            >
+              <div className="flex justify-between items-start">
+                <div className="p-3 bg-white/40 rounded-2xl border border-cyan-600">
+                  <Users size={28} className="text-black" />
+                </div>
+                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+              </div>
+              <div>
+                <h2 className="font-black text-2xl leading-tight text-black">Personal</h2>
+                <p className="text-xs text-black font-extrabold mt-1">Creación de usuarios y control de turnos</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Métricas */}
+          {esSuperAdminOrAdmin && (
+            <Link
+              href="/metricas"
+              className="group relative bg-orange-400 hover:bg-orange-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-orange-700 overflow-hidden"
+            >
+              <div className="flex justify-between items-start">
+                <div className="p-3 bg-white/40 rounded-2xl border border-orange-600">
+                  <TrendingUp size={28} className="text-black" />
+                </div>
+                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+              </div>
+              <div>
+                <h2 className="font-black text-2xl leading-tight text-black">Métricas</h2>
+                <p className="text-xs text-black font-extrabold mt-1">Productos más vendidos y rotación de stock</p>
+              </div>
+            </Link>
+          )}
         </div>
-      </div>
-
-      {/* Grilla Principal */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Punto de Venta */}
-        <Link
-          href="/ventas"
-          className="group relative bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-5 rounded-3xl shadow-md shadow-emerald-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-emerald-500/30 overflow-hidden"
-        >
-          <div className="flex justify-between items-start">
-            <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
-              <ShoppingBag size={26} />
-            </div>
-            <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
-          </div>
-          <div>
-            <h2 className="font-bold text-xl leading-tight">Punto de Venta</h2>
-            <p className="text-xs text-emerald-100 font-medium mt-1">Cobrar e imprimir ticket</p>
-          </div>
-        </Link>
-
-        {/* Inventario (COLORIDO) */}
-        {esSuperAdminOrAdmin && (
-          <Link
-            href="/inventario"
-            className="group relative bg-gradient-to-br from-amber-500 to-orange-600 text-white p-5 rounded-3xl shadow-md shadow-amber-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-amber-500/30 overflow-hidden"
-          >
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
-                <PackageSearch size={26} />
-              </div>
-              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
-            </div>
-            <div>
-              <h2 className="font-bold text-xl leading-tight">Inventario</h2>
-              <p className="text-xs text-amber-100 font-medium mt-1">Control de stock y reingreso</p>
-            </div>
-          </Link>
-        )}
-
-        {/* Cuentas Corrientes */}
-        {puedeVerCaja && (
-          <Link
-            href="/cuentas-corrientes"
-            className="group relative bg-gradient-to-br from-indigo-600 to-violet-600 text-white p-5 rounded-3xl shadow-md shadow-indigo-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-indigo-500/30 overflow-hidden"
-          >
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
-                <BookUser size={26} />
-              </div>
-              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
-            </div>
-            <div>
-              <h2 className="font-bold text-xl leading-tight">Cuentas Corrientes</h2>
-              <p className="text-xs text-indigo-100 font-medium mt-1">Fiados, deudores y pagos</p>
-            </div>
-          </Link>
-        )}
-
-        {/* Promociones */}
-        {esSuperAdminOrAdmin && (
-          <Link
-            href="/promociones"
-            className="group relative bg-gradient-to-br from-purple-600 to-indigo-600 text-white p-5 rounded-3xl shadow-md shadow-purple-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-purple-500/30 overflow-hidden"
-          >
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
-                <Sparkles size={26} />
-              </div>
-              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
-            </div>
-            <div>
-              <h2 className="font-bold text-xl leading-tight">Promos</h2>
-              <p className="text-xs text-purple-100 font-medium mt-1">Combos Fernet, Burgers y +</p>
-            </div>
-          </Link>
-        )}
-
-        {/* Caja del Día (COLORIDO) */}
-        {puedeVerCaja && (
-          <Link
-            href="/caja"
-            className="group relative bg-gradient-to-br from-emerald-600 to-teal-600 text-white p-5 rounded-3xl shadow-md shadow-emerald-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-emerald-500/30 overflow-hidden"
-          >
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
-                <DollarSign size={26} />
-              </div>
-              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
-            </div>
-            <div>
-              <h2 className="font-bold text-xl leading-tight">Caja del Día</h2>
-              <p className="text-xs text-emerald-100 font-medium mt-1">Totales, arqueo y cierres</p>
-            </div>
-          </Link>
-        )}
-
-        {/* Personal / Usuarios */}
-        {esSuperAdminOrAdmin && (
-          <Link
-            href="/usuarios"
-            className="group relative bg-gradient-to-br from-blue-600 to-cyan-600 text-white p-5 rounded-3xl shadow-md shadow-blue-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-blue-500/30 overflow-hidden"
-          >
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
-                <Users size={26} />
-              </div>
-              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
-            </div>
-            <div>
-              <h2 className="font-bold text-xl leading-tight">Personal</h2>
-              <p className="text-xs text-blue-100 font-medium mt-1">Crear usuarios y turnos</p>
-            </div>
-          </Link>
-        )}
-
-        {/* Métricas & Popularidad */}
-        {esSuperAdminOrAdmin && (
-          <Link
-            href="/metricas"
-            className="group relative bg-gradient-to-br from-amber-500 to-orange-600 text-white p-5 rounded-3xl shadow-md shadow-amber-500/20 flex flex-col justify-between h-44 active:scale-95 transition-all hover:shadow-lg hover:shadow-amber-500/30 overflow-hidden"
-          >
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-md">
-                <TrendingUp size={26} />
-              </div>
-              <ArrowRight size={18} className="opacity-60 group-hover:translate-x-1 transition-transform" />
-            </div>
-            <div>
-              <h2 className="font-bold text-xl leading-tight">Métricas</h2>
-              <p className="text-xs text-amber-100 font-medium mt-1">Más vendidos y rotación</p>
-            </div>
-          </Link>
-        )}
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }
