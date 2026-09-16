@@ -1,4 +1,3 @@
-// app/ventas/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -39,6 +38,12 @@ export default function VentasPage() {
   const [clientes, setClientes] = useState<ClienteCtaCte[]>([])
   const [busquedaCliente, setBusquedaCliente] = useState('')
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteCtaCte | null>(null)
+
+  // Estados para el Modal de Producto Suelto / Carga Rápida
+  const [mostrarModalSuelto, setMostrarModalSuelto] = useState(false)
+  const [sueltoNombre, setSueltoNombre] = useState('')
+  const [sueltoPrecio, setSueltoPrecio] = useState('')
+  const [sueltoGuardarInventario, setSueltoGuardarInventario] = useState(false)
 
   const [pagoEfectivo, setPagoEfectivo] = useState('')
   const [pagoTarjeta, setPagoTarjeta] = useState('')
@@ -112,6 +117,56 @@ export default function VentasPage() {
     setMensaje('')
   }
 
+  // Manejador para agregar producto suelto o carga rápida
+  const manejarProductoSuelto = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const precioNum = parseFloat(sueltoPrecio)
+    if (!sueltoNombre.trim() || isNaN(precioNum) || precioNum <= 0) {
+      setMensaje('⚠️ Ingresá un nombre y un precio válido para el producto suelto.')
+      return
+    }
+
+    let productoId = 'suelto-' + Date.now()
+
+    // Si el usuario marca la opción de guardarlo permanentemente en el inventario
+    if (sueltoGuardarInventario && kioskoId) {
+      const { data, error } = await supabase.from('productos').insert([{
+        kiosko_id: kioskoId,
+        nombre: sueltoNombre.trim(),
+        precio: precioNum,
+        stock_actual: 0,
+        codigo_barras: 'SUELTO-' + Math.floor(Math.random() * 10000),
+        categoria: 'Otros'
+      }]).select('id').single()
+
+      if (!error && data) {
+        productoId = String(data.id)
+        // Actualizar estado local de productos
+        setProductos(prev => [{
+          id: productoId,
+          nombre: sueltoNombre.trim(),
+          precio: precioNum,
+          stock_actual: 0,
+          codigo_barras: 'SUELTO'
+        }, ...prev])
+      }
+    }
+
+    agregarAlCarrito({
+      id: productoId,
+      nombre: sueltoNombre.trim(),
+      precio: precioNum,
+      esPromo: false,
+      stock_actual: 999
+    })
+
+    setSueltoNombre('')
+    setSueltoPrecio('')
+    setSueltoGuardarInventario(false)
+    setMostrarModalSuelto(false)
+    setMensaje('¡Producto suelto agregado al pedido!')
+  }
+
   const incrementarCantidad = (id: string, esPromo?: boolean) => {
     setCarrito((prev) =>
       prev.map((item) =>
@@ -152,7 +207,7 @@ export default function VentasPage() {
     if (coincidencias.length > 0) {
       agregarAlCarrito(coincidencias[0])
     } else {
-      setMensaje('Artículo no encontrado')
+      setMensaje('Artículo no encontrado. Podés agregarlo como "Producto Suelto".')
     }
   }
 
@@ -173,7 +228,6 @@ export default function VentasPage() {
     (p.codigo_barras && p.codigo_barras.includes(textoTrim))
   )
 
-  // Filtrado de clientes para la cuenta corriente
   const clienteTrim = busquedaCliente.trim()
   const clientesSugeridos = clienteTrim.length === 0 ? [] : clientes.filter((c) =>
     c.nombre.toLowerCase().includes(clienteTrim.toLowerCase()) ||
@@ -227,7 +281,6 @@ export default function VentasPage() {
     else if (valTransf > 0 && valEfectivo === 0 && valTarjeta === 0 && valCtaCte === 0) metodoFinal = 'transferencia'
     else if (valCtaCte > 0 && valEfectivo === 0 && valTarjeta === 0 && valTransf === 0) metodoFinal = 'cuenta_corriente'
 
-    // 1. Insertar la Venta principal
     const { data: ventaInsertada, error: errVenta } = await supabase
       .from('ventas')
       .insert([{
@@ -250,17 +303,14 @@ export default function VentasPage() {
 
     const ventaId = ventaInsertada[0].id
 
-    // 2. Si parte del pago fue a Cuenta Corriente, actualizamos saldo y guardamos historial
     if (valCtaCte > 0 && clienteSeleccionado) {
       const nuevoSaldo = clienteSeleccionado.saldo_actual + valCtaCte
 
-      // Actualizar saldo actual en la tabla clientes_cuentas
       await supabase
         .from('clientes_cuentas')
         .update({ saldo_actual: nuevoSaldo })
         .eq('id', clienteSeleccionado.id)
 
-      // Registrar movimiento en historial_cuentas con tipo 'fiado' o 'venta'
       await supabase.from('historial_cuentas').insert([{
         cliente_id: clienteSeleccionado.id,
         tipo: 'fiado',
@@ -269,9 +319,9 @@ export default function VentasPage() {
       }])
     }
 
-    // 3. Registrar detalle de productos y descontar stock
     for (const item of carrito) {
-      const idLimpio = item.esPromo ? null : parseInt(String(item.id), 10)
+      const isCustomSuelto = String(item.id).startsWith('suelto-')
+      const idLimpio = (item.esPromo || isCustomSuelto) ? null : parseInt(String(item.id), 10)
 
       const detalleData = {
         venta_id: ventaId,
@@ -289,7 +339,7 @@ export default function VentasPage() {
         return
       }
 
-      if (!item.esPromo && idLimpio !== null) {
+      if (!item.esPromo && !isCustomSuelto && idLimpio !== null) {
         const { data: productoActual } = await supabase
           .from('productos')
           .select('stock_actual')
@@ -354,7 +404,7 @@ export default function VentasPage() {
         
         <div className="md:col-span-6 space-y-4">
           
-          {/* BUSCADOR DE CUENTAS CORRIENTES CONECTADO A 'clientes_cuentas' */}
+          {/* CUENTA CORRIENTE */}
           <div className="bg-indigo-50 border-2 border-indigo-200 rounded-2xl shadow-sm p-4 relative overflow-visible">
             <label className="block text-xs font-bold text-indigo-900 mb-1 flex items-center gap-1.5">
               <BookUser size={15} /> Asignar a Cuenta Corriente (Opcional)
@@ -417,7 +467,7 @@ export default function VentasPage() {
             )}
           </div>
 
-          {/* Buscador de Productos */}
+          {/* BUSCADOR DE PRODUCTOS Y BOTÓN DE PRODUCTO SUELTO */}
           <div className="bg-white rounded-2xl shadow-sm p-4 relative">
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Buscar por Nombre, Código de Barras o QR
@@ -442,6 +492,16 @@ export default function VentasPage() {
                 title="Abrir cámara de escaneo"
               >
                 <Camera size={18} />
+              </button>
+
+              {/* NUEVO BOTÓN: PRODUCTO SUELTO / CARGA RÁPIDA */}
+              <button
+                type="button"
+                onClick={() => setMostrarModalSuelto(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-3 rounded-xl flex items-center gap-1.5 font-bold text-xs shrink-0 transition active:scale-95 shadow-sm"
+                title="Crear producto suelto con nombre y precio"
+              >
+                <Plus size={16} /> Suelto
               </button>
             </div>
 
@@ -472,7 +532,7 @@ export default function VentasPage() {
             )}
           </div>
 
-          {/* Detalle del Pedido */}
+          {/* DETALLE DEL PEDIDO */}
           <div className="bg-white rounded-2xl shadow-sm p-4">
             <div className="flex justify-between items-center border-b pb-3 mb-3">
               <h2 className="font-bold text-gray-700 text-sm flex items-center gap-2">
@@ -484,7 +544,7 @@ export default function VentasPage() {
             </div>
 
             {carrito.length === 0 ? (
-              <p className="text-center text-gray-400 py-12 text-sm">Buscá productos o promos para armar el pedido.</p>
+              <p className="text-center text-gray-400 py-12 text-sm">Buscá productos, promos o usá &quot;Suelto&quot; para armar el pedido.</p>
             ) : (
               <div className="divide-y max-h-80 md:max-h-[300px] overflow-y-auto pr-1">
                 {carrito.map((item) => (
@@ -534,7 +594,7 @@ export default function VentasPage() {
           </div>
         </div>
 
-        {/* Columna Derecha: Medios de Pago */}
+        {/* COLUMNA DERECHA: MEDIOS DE PAGO */}
         <div className="md:col-span-6 bg-white rounded-2xl shadow-sm p-5 sticky top-6">
           <div className="flex justify-between items-center mb-3">
             <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
@@ -655,6 +715,80 @@ export default function VentasPage() {
 
       </div>
 
+      {/* MODAL DE PRODUCTO SUELTO / CARGA RÁPIDA */}
+      {mostrarModalSuelto && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative shadow-2xl">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b">
+              <h3 className="font-bold text-gray-800 text-base">Agregar Producto Suelto</h3>
+              <button
+                onClick={() => setMostrarModalSuelto(false)}
+                className="p-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={manejarProductoSuelto} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Nombre del ítem o servicio</label>
+                <input
+                  type="text"
+                  value={sueltoNombre}
+                  onChange={(e) => setSueltoNombre(e.target.value)}
+                  placeholder="Ej: Fotocopia, Café express, Varios..."
+                  required
+                  className="w-full p-3 border rounded-xl bg-gray-50 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Precio ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={sueltoPrecio}
+                  onChange={(e) => setSueltoPrecio(e.target.value)}
+                  placeholder="0.00"
+                  required
+                  className="w-full p-3 border rounded-xl bg-gray-50 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="guardarInv"
+                  checked={sueltoGuardarInventario}
+                  onChange={(e) => setSueltoGuardarInventario(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                />
+                <label htmlFor="guardarInv" className="text-xs text-gray-600 font-medium cursor-pointer">
+                  Guardar también en el inventario general
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarModalSuelto(false)}
+                  className="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold text-xs transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <Plus size={16} /> Agregar al Pedido
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ESCÁNER */}
       {mostrarEscaner && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-xl">
