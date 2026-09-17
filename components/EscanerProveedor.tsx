@@ -28,7 +28,7 @@ export default function EscanearProveedor({ onDatosExtraidos }: { onDatosExtraid
       setProgreso('Extrayendo datos...')
 
       // Truco útil para Argentina: Buscamos patrones de CUIT (XX-XXXXXXXX-X) automáticamente
-      const cuitMatch = texto.match(/\b\d{2}-\d{8}-\d{1}\b)
+      const cuitMatch = texto.match(/\b\d{2}-\d{8}-\d{1}\b/)
       const cuitEncontrado = cuitMatch ? cuitMatch[0] : ''
 
       // Le pasamos los datos detectados al formulario principal de tu modal
