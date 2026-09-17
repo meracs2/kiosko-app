@@ -45,8 +45,11 @@ export default function InventarioPage() {
 
   // ESTADOS PARA EL MODAL DE EDICIÓN
   const [productoEditando, setProductoEditando] = useState<Producto | null>(null)
+  const [editCodigo, setEditCodigo] = useState('')
   const [editPrecio, setEditPrecio] = useState('')
   const [editStock, setEditStock] = useState('')
+  const [editCategoria, setEditCategoria] = useState('Bebidas')
+  const [mostrarEscanerModal, setMostrarEscanerModal] = useState(false)
 
   const fetchProductos = async (idKiosko: string) => {
     const { data } = await supabase
@@ -122,8 +125,10 @@ export default function InventarioPage() {
 
   const abrirModalEdicion = (prod: Producto) => {
     setProductoEditando(prod)
+    setEditCodigo(prod.codigo_barras)
     setEditPrecio(prod.precio.toString())
     setEditStock(prod.stock_actual.toString())
+    setEditCategoria(prod.categoria || 'Bebidas')
   }
 
   const guardarEdicionModal = async (e: React.FormEvent) => {
@@ -138,11 +143,20 @@ export default function InventarioPage() {
       return
     }
 
+    // Verificar si el nuevo código ya lo tiene otro producto diferente
+    const codigoOcupado = productos.find(p => p.codigo_barras === editCodigo.trim() && p.id !== productoEditando.id)
+    if (codigoOcupado) {
+      alert(`⚠️ El código "${editCodigo}" ya está asignado a otro producto: ${codigoOcupado.nombre}`)
+      return
+    }
+
     const { error } = await supabase
       .from('productos')
       .update({ 
+        codigo_barras: editCodigo.trim(),
         precio: nuevoPrecio,
-        stock_actual: nuevoStock 
+        stock_actual: nuevoStock,
+        categoria: editCategoria
       })
       .eq('id', productoEditando.id)
       .eq('kiosko_id', kioskoId)
@@ -375,7 +389,7 @@ export default function InventarioPage() {
             </div>
           </div>
 
-          {/* FILTROS CON BARRA DE DESPLAZAMIENTO HORIZONTAL PROLIJA */}
+          {/* FILTROS */}
           <div className="flex gap-1.5 overflow-x-auto pb-3 mb-4 text-xs scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
             <button
               onClick={() => setFiltroCategoria('todos')}
@@ -456,7 +470,7 @@ export default function InventarioPage() {
                             <button
                               onClick={() => abrirModalEdicion(prod)}
                               className="p-2 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-xl transition-all shadow-xs border border-slate-200 active:scale-95"
-                              title="Modificar precio y stock"
+                              title="Modificar datos, categoría y stock"
                             >
                               <Edit2 size={15} />
                             </button>
@@ -480,7 +494,7 @@ export default function InventarioPage() {
 
       </div>
 
-      {/* MODAL DE EDICIÓN DE PRECIO Y STOCK */}
+      {/* MODAL DE EDICIÓN (CÓDIGO, CATEGORÍA, PRECIO Y STOCK) */}
       {productoEditando && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative shadow-2xl border border-slate-100">
@@ -498,6 +512,48 @@ export default function InventarioPage() {
             </div>
 
             <form onSubmit={guardarEdicionModal} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Código de Barras</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editCodigo}
+                    onChange={(e) => setEditCodigo(e.target.value)}
+                    placeholder="Escaneá o tipeá nuevo código"
+                    required
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarEscanerModal(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-xs active:scale-95"
+                    title="Escanear con cámara"
+                  >
+                    <Camera size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Categoría</label>
+                <div className="relative">
+                  <select
+                    value={editCategoria}
+                    onChange={(e) => setEditCategoria(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none"
+                  >
+                    {CATEGORIAS.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <Layers size={16} />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nuevo Precio ($)</label>
                 <div className="relative">
@@ -544,7 +600,7 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* MODAL DE ESCÁNER */}
+      {/* MODAL DE ESCÁNER PARA NUEVO PRODUCTO */}
       {mostrarEscaner && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-2xl border border-slate-100">
@@ -554,7 +610,7 @@ export default function InventarioPage() {
                 onClick={() => setMostrarEscaner(false)}
                 className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors"
               >
-                <X size={18} />
+                <X size= {18} />
               </button>
             </div>
             <div className="overflow-hidden rounded-xl">
@@ -563,6 +619,32 @@ export default function InventarioPage() {
                   if (!codigoLeido) return
                   setCodigoBarras(codigoLeido.trim())
                   setMostrarEscaner(false)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ESCÁNER DENTRO DEL MODAL DE EDICIÓN */}
+      {mostrarEscanerModal && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-2xl border border-slate-100">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-slate-800 text-sm">Escaneá el nuevo código</h3>
+              <button
+                onClick={() => setMostrarEscanerModal(false)}
+                className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="overflow-hidden rounded-xl">
+              <Scanner
+                onScan={(codigoLeido) => {
+                  if (!codigoLeido) return
+                  setEditCodigo(codigoLeido.trim())
+                  setMostrarEscanerModal(false)
                 }}
               />
             </div>

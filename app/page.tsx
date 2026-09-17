@@ -5,14 +5,51 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Sparkles, PackageSearch, ShoppingBag, DollarSign, Store, ArrowRight, LogOut, Users, TrendingUp, BookUser } from 'lucide-react'
+import { 
+  Sun,
+  Moon,
+  Sparkles, 
+  PackageSearch, 
+  ShoppingBag, 
+  DollarSign, 
+  Store, 
+  ArrowRight, 
+  LogOut, 
+  Users, 
+  TrendingUp, 
+  BookUser, 
+  Truck, 
+  X, 
+  ShoppingCart, 
+  ExternalLink,
+  Globe,
+  LayoutGrid,
+  ListOrdered
+} from 'lucide-react'
 
 export default function Home() {
   const [rol, setRol] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
+  const [esOscuro, setEsOscuro] = useState(false)
+  const [estiloVisual, setEstiloVisual] = useState<'colorido' | 'minimalista'>('colorido')
+  
+  // Estado para modal de supermercados (el de proveedores ya no usa modal)
+  const [mostrarModalSupermercados, setMostrarModalSupermercados] = useState(false)
+
   const router = useRouter()
 
   useEffect(() => {
+    // 1. Configuración de Tema (Claro / Oscuro)
+    const temaGuardado = localStorage.getItem('theme') === 'dark'
+    setEsOscuro(temaGuardado)
+
+    // 2. Configuración de Estilo Visual
+    const estiloGuardado = localStorage.getItem('ui_style') as 'colorido' | 'minimalista'
+    if (estiloGuardado) {
+      setEstiloVisual(estiloGuardado)
+    }
+
+    // 3. Verificación de Sesión y Turno
     const verificarSesionYRol = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -22,7 +59,6 @@ export default function Home() {
           return
         }
 
-        // 1. Pedimos el perfil completo con los horarios
         const { data: perfil, error } = await supabase
           .from('perfiles')
           .select('rol, hora_inicio, hora_fin')
@@ -30,32 +66,21 @@ export default function Home() {
           .single()
 
         if (error || !perfil) {
-          console.error("Error al obtener perfil:", error)
           setRol('empleado')
           setCargando(false)
           return
         }
 
-        // 2. Si es empleado, validamos el turno estrictamente
         if (perfil.rol === 'empleado') {
           const inicio = perfil.hora_inicio || '08:00'
           const fin = perfil.hora_fin || '17:00'
-
           const ahora = new Date()
-          const horas = String(ahora.getHours()).padStart(2, '0')
-          const minutos = String(ahora.getMinutes()).padStart(2, '0')
-          const horaActualStr = `${horas}:${minutos}`
+          const horaActualStr = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
 
-          let dentroDeHorario = false
-          if (inicio <= fin) {
-            dentroDeHorario = horaActualStr >= inicio && horaActualStr <= fin
-          } else {
-            dentroDeHorario = horaActualStr >= inicio || horaActualStr <= fin
-          }
+          let dentroDeHorario = inicio <= fin ? (horaActualStr >= inicio && horaActualStr <= fin) : (horaActualStr >= inicio || horaActualStr <= fin)
 
-          // SI ESTÁ FUERA DE TURNO: Expulsión inmediata
           if (!dentroDeHorario) {
-            alert(`⏰ Fuera de turno. Tu horario es de ${inicio} a ${fin} hs. Son las ${horaActualStr} hs.`)
+            alert(`⏰ Fuera de turno. Tu horario es de ${inicio} a ${fin} hs.`)
             await supabase.auth.signOut()
             window.location.href = '/login'
             return
@@ -64,7 +89,6 @@ export default function Home() {
 
         setRol(perfil.rol)
       } catch (err) {
-        console.error('Error al verificar sesión:', err)
         setRol('empleado')
       } finally {
         setCargando(false)
@@ -74,6 +98,18 @@ export default function Home() {
     verificarSesionYRol()
   }, [router])
 
+  const cambiarTema = () => {
+    const nuevoEstado = !esOscuro
+    setEsOscuro(nuevoEstado)
+    localStorage.setItem('theme', nuevoEstado ? 'dark' : 'light')
+  }
+
+  const cambiarEstilo = () => {
+    const nuevoEstilo = estiloVisual === 'minimalista' ? 'colorido' : 'minimalista'
+    setEstiloVisual(nuevoEstilo)
+    localStorage.setItem('ui_style', nuevoEstilo)
+  }
+
   const cerrarSesion = async () => {
     await supabase.auth.signOut()
     router.replace('/login')
@@ -81,190 +117,326 @@ export default function Home() {
 
   if (cargando) {
     return (
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <p className="text-base font-black text-black animate-pulse">Verificando turno y permisos...</p>
+      <main className={`min-h-screen flex items-center justify-center ${esOscuro ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+        <p className="text-sm font-medium animate-pulse">Cargando sistema...</p>
       </main>
     )
   }
 
-  // Permisos según el rol
   const esSuperAdminOrAdmin = rol === 'super_admin' || rol === 'admin'
   const puedeVerCaja = rol === 'super_admin' || rol === 'admin' || rol === 'empleado'
 
+  // Variables de estilo dinámicas según modo claro/oscuro
+  const bgMain = esOscuro ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+  const bgHeader = esOscuro ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+  const bgCard = esOscuro ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+  const textMuted = esOscuro ? 'text-slate-400' : 'text-slate-500'
+  const bgIcon = esOscuro ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-800'
+  const badgeBg = esOscuro ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans antialiased text-black">
-      {/* Header Estilo Escritorio (Ancho Completo) */}
-      <header className="bg-white border-b-2 border-slate-300 px-8 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-        <div className="flex items-center gap-3.5">
-          <div className="bg-blue-600 text-black p-2.5 rounded-2xl shadow-md border-2 border-blue-900">
-            <Store size={24} className="text-black" />
+    <div className={`min-h-screen flex flex-col font-sans antialiased transition-colors duration-200 ${bgMain}`}>
+      
+      {/* HEADER */}
+      <header className={`border-b px-6 sm:px-10 py-4 flex items-center justify-between sticky top-0 z-40 shadow-xs ${bgHeader}`}>
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-xl flex items-center justify-center shadow-xs ${esOscuro ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}`}>
+            <Store size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-black tracking-tight">Kiosko POS</h1>
-            <p className="text-xs text-black font-extrabold">Gestión inteligente de ventas y stock</p>
+            <h1 className="text-sm font-bold tracking-tight">Kiosko POS</h1>
+            <p className={`text-[11px] font-medium ${textMuted}`}>Gestión inteligente</p>
           </div>
         </div>
 
-        {/* Badge de rol, estado y botón salir */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-slate-100 px-3.5 py-1.5 rounded-full border-2 border-slate-300 text-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
-            <span className="text-black font-black">Operativo</span>
-            <span className="text-slate-400 font-bold">|</span>
-            <span className="text-black font-black uppercase tracking-wider">Rol: {rol || 'Cargando...'}</span>
+        {/* CONTROLES DERECHA */}
+        <div className="flex items-center gap-2.5">
+          <div className={`hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs border ${badgeBg}`}>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Rol: {rol || '...'}</span>
           </div>
 
+          {/* BOTÓN CAMBIO DE ESTILO */}
+          <button
+            onClick={cambiarEstilo}
+            title={estiloVisual === 'minimalista' ? "Cambiar a Estilo Colorido" : "Cambiar a Estilo Minimalista"}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl transition text-xs font-semibold cursor-pointer ${esOscuro ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'}`}
+          >
+            {estiloVisual === 'minimalista' ? <LayoutGrid size={15} className="text-blue-400" /> : <ListOrdered size={15} className="text-purple-400" />}
+            <span className="hidden md:inline capitalize">{estiloVisual}</span>
+          </button>
+
+          {/* BOTÓN TEMA (Claro / Oscuro) */}
+          <button
+            onClick={cambiarTema}
+            title={esOscuro ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
+            className={`p-2.5 border rounded-xl transition cursor-pointer flex items-center justify-center ${esOscuro ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'}`}
+          >
+            {esOscuro ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-slate-600" />}
+          </button>
+
+          {/* BOTÓN SALIR */}
           <button
             onClick={cerrarSesion}
             title="Cerrar Sesión"
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-black hover:bg-red-200 hover:text-red-950 border-2 border-slate-300 rounded-xl transition text-xs font-black shadow-2xs"
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl transition text-xs font-semibold cursor-pointer ${esOscuro ? 'bg-slate-800 border-slate-700 hover:bg-red-950/40 hover:text-red-400 text-slate-200' : 'bg-slate-100 border-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-700'}`}
           >
-            <LogOut size={16} />
-            Salir
+            <LogOut size={15} />
+            <span className="hidden sm:inline">Salir</span>
           </button>
         </div>
       </header>
 
-      {/* Grilla Principal de Escritorio (Ocupa todo el ancho disponible) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 sm:p-10 flex flex-col justify-center">
-        <div className="mb-6">
-          <h2 className="text-2xl font-black text-black tracking-tight">Panel de Control</h2>
-          <p className="text-black font-extrabold text-sm mt-0.5">Seleccioná una sección para comenzar a operar.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Punto de Venta */}
-          <Link
-            href="/ventas"
-            className="group relative bg-emerald-400 hover:bg-emerald-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-emerald-700 overflow-hidden"
-          >
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-white/40 rounded-2xl border border-emerald-600">
-                <ShoppingBag size={28} className="text-black" />
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="flex-1 w-full max-w-7xl mx-auto p-6 sm:p-10 flex flex-col">
+        
+        {/* ----------------- ESTILO MINIMALISTA ----------------- */}
+        {estiloVisual === 'minimalista' && (
+          <div className="flex flex-col lg:flex-row gap-8 items-start flex-1">
+            
+            <aside className={`w-full lg:w-72 rounded-2xl border p-4 shadow-xs shrink-0 ${bgCard}`}>
+              <div className="mb-3 px-3">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Navegación</h2>
               </div>
-              <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+              <nav className="space-y-1">
+                <Link href="/ventas" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <ShoppingBag size={16} className="text-slate-400" />
+                    <span>Punto de Venta</span>
+                  </div>
+                  <ArrowRight size={14} className="text-slate-400" />
+                </Link>
+
+                {esSuperAdminOrAdmin && (
+                  <Link href="/inventario" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <PackageSearch size={16} className="text-slate-400" />
+                      <span>Inventario</span>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400" />
+                  </Link>
+                )}
+
+                {puedeVerCaja && (
+                  <Link href="/cuentas-corrientes" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <BookUser size={16} className="text-slate-400" />
+                      <span>Cuentas Corrientes</span>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400" />
+                  </Link>
+                )}
+
+                {esSuperAdminOrAdmin && (
+                  <Link href="/promociones" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles size={16} className="text-slate-400" />
+                      <span>Promos</span>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400" />
+                  </Link>
+                )}
+
+                {puedeVerCaja && (
+                  <Link href="/caja" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <DollarSign size={16} className="text-slate-400" />
+                      <span>Caja del Día</span>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400" />
+                  </Link>
+                )}
+
+                {esSuperAdminOrAdmin && (
+                  <Link href="/usuarios" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <Users size={16} className="text-slate-400" />
+                      <span>Personal</span>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400" />
+                  </Link>
+                )}
+
+                {esSuperAdminOrAdmin && (
+                  <Link href="/metricas" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <TrendingUp size={16} className="text-slate-400" />
+                      <span>Métricas</span>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400" />
+                  </Link>
+                )}
+
+                <div onClick={() => setMostrarModalSupermercados(true)} className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <ShoppingCart size={16} className="text-slate-400" />
+                    <span>Supermercados CBA</span>
+                  </div>
+                  <ArrowRight size={14} className="text-slate-400" />
+                </div>
+
+                {esSuperAdminOrAdmin && (
+                  <Link href="/proveedores" className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${esOscuro ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <Truck size={16} className="text-slate-400" />
+                      <span>Proveedores</span>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-400" />
+                  </Link>
+                )}
+              </nav>
+            </aside>
+
+            <div className={`flex-1 w-full flex flex-col justify-center items-center p-10 rounded-2xl border border-dashed text-center min-h-[400px] shadow-xs ${bgCard}`} style={{ borderColor: esOscuro ? '#334155' : '#cbd5e1' }}>
+              <div className={`p-4 rounded-2xl mb-4 ${bgIcon}`}>
+                <Store size={32} />
+              </div>
+              <h2 className="text-lg font-bold tracking-tight mb-1">Bienvenido al Kiosko POS</h2>
+              <p className={`text-xs max-w-sm ${textMuted}`}>
+                Seleccioná una opción del menú lateral izquierdo para operar con el sistema de ventas e inventario.
+              </p>
             </div>
-            <div>
-              <h2 className="font-black text-2xl leading-tight text-black">Punto de Venta</h2>
-              <p className="text-xs text-black font-extrabold mt-1">Cobrar e imprimir ticket de forma rápida</p>
+
+          </div>
+        )}
+
+        {/* ----------------- ESTILO COLORIDO ----------------- */}
+        {estiloVisual === 'colorido' && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-xl font-bold tracking-tight">Panel de Control</h2>
+              <p className={`text-xs mt-0.5 ${textMuted}`}>Seleccioná un módulo para comenzar a operar.</p>
             </div>
-          </Link>
 
-          {/* Inventario */}
-          {esSuperAdminOrAdmin && (
-            <Link
-              href="/inventario"
-              className="group relative bg-amber-400 hover:bg-amber-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-amber-700 overflow-hidden"
-            >
-              <div className="flex justify-between items-start">
-                <div className="p-3 bg-white/40 rounded-2xl border border-amber-600">
-                  <PackageSearch size={28} className="text-black" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              
+              <Link href="/ventas" className="group bg-emerald-400 hover:brightness-105 p-5 rounded-2xl border-2 border-emerald-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                <div className="flex justify-between items-start">
+                  <div className="p-2.5 bg-white/70 rounded-xl"><ShoppingBag size={20} className="text-slate-900" /></div>
+                  <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
                 </div>
-                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
-              </div>
-              <div>
-                <h2 className="font-black text-2xl leading-tight text-black">Inventario</h2>
-                <p className="text-xs text-black font-extrabold mt-1">Control de stock y reingreso de mercadería</p>
-              </div>
-            </Link>
-          )}
+                <div><h3 className="font-black text-base text-slate-900">Punto de Venta</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Cobrar e imprimir ticket rápido</p></div>
+              </Link>
 
-          {/* Cuentas Corrientes */}
-          {puedeVerCaja && (
-            <Link
-              href="/cuentas-corrientes"
-              className="group relative bg-indigo-400 hover:bg-indigo-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-indigo-700 overflow-hidden"
-            >
-              <div className="flex justify-between items-start">
-                <div className="p-3 bg-white/40 rounded-2xl border border-indigo-600">
-                  <BookUser size={28} className="text-black" />
-                </div>
-                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
-              </div>
-              <div>
-                <h2 className="font-black text-2xl leading-tight text-black">Cuentas Corrientes</h2>
-                <p className="text-xs text-black font-extrabold mt-1">Fiados, deudores y pagos detallados</p>
-              </div>
-            </Link>
-          )}
+              {esSuperAdminOrAdmin && (
+                <Link href="/inventario" className="group bg-amber-400 hover:brightness-105 p-5 rounded-2xl border-2 border-amber-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-white/70 rounded-xl"><PackageSearch size={20} className="text-slate-900" /></div>
+                    <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <div><h3 className="font-black text-base text-slate-900">Inventario</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Control de stock y mercadería</p></div>
+                </Link>
+              )}
 
-          {/* Promociones */}
-          {esSuperAdminOrAdmin && (
-            <Link
-              href="/promociones"
-              className="group relative bg-purple-400 hover:bg-purple-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-purple-700 overflow-hidden"
-            >
-              <div className="flex justify-between items-start">
-                <div className="p-3 bg-white/40 rounded-2xl border border-purple-600">
-                  <Sparkles size={28} className="text-black" />
-                </div>
-                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
-              </div>
-              <div>
-                <h2 className="font-black text-2xl leading-tight text-black">Promos</h2>
-                <p className="text-xs text-black font-extrabold mt-1">Combos Fernet, Burgers y más ofertas</p>
-              </div>
-            </Link>
-          )}
+              {puedeVerCaja && (
+                <Link href="/cuentas-corrientes" className="group bg-indigo-400 hover:brightness-105 p-5 rounded-2xl border-2 border-indigo-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-white/70 rounded-xl"><BookUser size={20} className="text-slate-900" /></div>
+                    <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <div><h3 className="font-black text-base text-slate-900">Cuentas Corrientes</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Fiados, deudores y pagos</p></div>
+                </Link>
+              )}
 
-          {/* Caja del Día */}
-          {puedeVerCaja && (
-            <Link
-              href="/caja"
-              className="group relative bg-teal-400 hover:bg-teal-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-teal-700 overflow-hidden"
-            >
-              <div className="flex justify-between items-start">
-                <div className="p-3 bg-white/40 rounded-2xl border border-teal-600">
-                  <DollarSign size={28} className="text-black" />
-                </div>
-                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
-              </div>
-              <div>
-                <h2 className="font-black text-2xl leading-tight text-black">Caja del Día</h2>
-                <p className="text-xs text-black font-extrabold mt-1">Totales, arqueos de caja y cierres</p>
-              </div>
-            </Link>
-          )}
+              {esSuperAdminOrAdmin && (
+                <Link href="/promociones" className="group bg-purple-400 hover:brightness-105 p-5 rounded-2xl border-2 border-purple-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-white/70 rounded-xl"><Sparkles size={20} className="text-slate-900" /></div>
+                    <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <div><h3 className="font-black text-base text-slate-900">Promos</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Combos y ofertas especiales</p></div>
+                </Link>
+              )}
 
-          {/* Personal / Usuarios */}
-          {esSuperAdminOrAdmin && (
-            <Link
-              href="/usuarios"
-              className="group relative bg-cyan-400 hover:bg-cyan-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-cyan-700 overflow-hidden"
-            >
-              <div className="flex justify-between items-start">
-                <div className="p-3 bg-white/40 rounded-2xl border border-cyan-600">
-                  <Users size={28} className="text-black" />
-                </div>
-                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
-              </div>
-              <div>
-                <h2 className="font-black text-2xl leading-tight text-black">Personal</h2>
-                <p className="text-xs text-black font-extrabold mt-1">Creación de usuarios y control de turnos</p>
-              </div>
-            </Link>
-          )}
+              {puedeVerCaja && (
+                <Link href="/caja" className="group bg-teal-400 hover:brightness-105 p-5 rounded-2xl border-2 border-teal-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-white/70 rounded-xl"><DollarSign size={20} className="text-slate-900" /></div>
+                    <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <div><h3 className="font-black text-base text-slate-900">Caja del Día</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Totales y arqueos de caja</p></div>
+                </Link>
+              )}
 
-          {/* Métricas */}
-          {esSuperAdminOrAdmin && (
-            <Link
-              href="/metricas"
-              className="group relative bg-orange-400 hover:bg-orange-500 text-black p-6 rounded-3xl shadow-md flex flex-col justify-between h-48 active:scale-95 transition-all border-2 border-orange-700 overflow-hidden"
-            >
-              <div className="flex justify-between items-start">
-                <div className="p-3 bg-white/40 rounded-2xl border border-orange-600">
-                  <TrendingUp size={28} className="text-black" />
+              {esSuperAdminOrAdmin && (
+                <Link href="/usuarios" className="group bg-sky-400 hover:brightness-105 p-5 rounded-2xl border-2 border-sky-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-white/70 rounded-xl"><Users size={20} className="text-slate-900" /></div>
+                    <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <div><h3 className="font-black text-base text-slate-900">Personal</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Usuarios y control de turnos</p></div>
+                </Link>
+              )}
+
+              {esSuperAdminOrAdmin && (
+                <Link href="/metricas" className="group bg-orange-400 hover:brightness-105 p-5 rounded-2xl border-2 border-orange-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-white/70 rounded-xl"><TrendingUp size={20} className="text-slate-900" /></div>
+                    <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <div><h3 className="font-black text-base text-slate-900">Métricas</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Más vendidos y rotación</p></div>
+                </Link>
+              )}
+
+              <div onClick={() => setMostrarModalSupermercados(true)} className="group bg-pink-400 hover:brightness-105 p-5 rounded-2xl border-2 border-pink-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900 cursor-pointer">
+                <div className="flex justify-between items-start">
+                  <div className="p-2.5 bg-white/70 rounded-xl"><ShoppingCart size={20} className="text-slate-900" /></div>
+                  <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
                 </div>
-                <ArrowRight size={20} className="text-black group-hover:translate-x-1.5 transition-transform" />
+                <div><h3 className="font-black text-base text-slate-900">Supermercados CBA</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Precios de referencia locales</p></div>
               </div>
-              <div>
-                <h2 className="font-black text-2xl leading-tight text-black">Métricas</h2>
-                <p className="text-xs text-black font-extrabold mt-1">Productos más vendidos y rotación de stock</p>
-              </div>
-            </Link>
-          )}
-        </div>
+
+              {esSuperAdminOrAdmin && (
+                <Link href="/proveedores" className="group bg-cyan-400 hover:brightness-105 p-5 rounded-2xl border-2 border-cyan-600 transition-all shadow-md flex flex-col justify-between h-40 text-slate-900">
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-white/70 rounded-xl"><Truck size={20} className="text-slate-900" /></div>
+                    <ArrowRight size={16} className="text-slate-900 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <div><h3 className="font-black text-base text-slate-900">Proveedores</h3><p className="text-xs font-semibold text-slate-900 opacity-80 mt-0.5">Facturas y costos de compra</p></div>
+                </Link>
+              )}
+
+            </div>
+          </div>
+        )}
+
       </main>
+
+      {/* MODAL SUPERMERCADOS CBA */}
+      {mostrarModalSupermercados && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-sm rounded-2xl p-6 relative shadow-xl border max-h-[90vh] overflow-y-auto ${bgCard}`}>
+            <div className={`flex justify-between items-center mb-4 pb-3 border-b ${esOscuro ? 'border-slate-800' : 'border-slate-100'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-xl ${bgIcon}`}><Globe size={18} /></div>
+                <div>
+                  <h3 className="font-bold text-sm">Supermercados Córdoba</h3>
+                  <p className={`text-[11px] font-medium ${textMuted}`}>Comparativa rápida</p>
+                </div>
+              </div>
+              <button onClick={() => setMostrarModalSupermercados(false)} className={`p-1.5 rounded-full transition-colors cursor-pointer ${esOscuro ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={16} /></button>
+            </div>
+            <p className={`text-xs mb-3 font-normal ${textMuted}`}>Seleccioná un comercio para abrir su plataforma:</p>
+            <div className="space-y-2">
+              {[
+                { name: 'Maxi Carrefour / Carrefour', url: 'https://www.carrefour.com.ar' },
+                { name: 'Vea Cencosud', url: 'https://www.vea.com.ar' },
+                { name: 'ChangoMâs', url: 'https://www.changomas.com.ar' },
+                { name: 'Dinosaurio / Dino Online', url: 'https://www.dinoonline.com.ar' },
+                { name: 'Mariano Max', url: 'https://www.marianomax.com.ar' },
+                { name: 'La Anónima', url: 'https://www.laanonima.com.ar' },
+                { name: 'Supermercados Cordiez', url: 'https://www.supermercadoscordiez.com.ar' },
+              ].map((supermercado, idx) => (
+                <a key={idx} href={supermercado.url} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-between p-3 border rounded-xl text-xs font-semibold transition-all cursor-pointer group ${esOscuro ? 'bg-slate-800/50 border-slate-700 hover:bg-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'}`}>
+                  <span>{supermercado.name}</span>
+                  <ExternalLink size={14} className="text-slate-400 group-hover:text-slate-200 transition-colors" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
