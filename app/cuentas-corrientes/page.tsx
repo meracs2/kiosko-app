@@ -65,7 +65,7 @@ export default function CuentasCorrientesPage() {
       .insert([{ nombre: nombreNuevo, telefono: telefonoNuevo, saldo_actual: 0 }])
 
     if (error) {
-      alert('Error al crear el cliente.')
+      alert('Error al crear el cliente: ' + error.message)
     } else {
       setNombreNuevo('')
       setTelefonoNuevo('')
@@ -104,16 +104,18 @@ export default function CuentasCorrientesPage() {
       ? clienteSeleccionado.saldo_actual + monto 
       : clienteSeleccionado.saldo_actual - monto
 
+    // 1. Actualizamos el saldo del cliente
     const { error: errorUpdate } = await supabase
       .from('clientes_cuentas')
       .update({ saldo_actual: nuevoSaldo })
       .eq('id', clienteSeleccionado.id)
 
     if (errorUpdate) {
-      alert('Error al actualizar el saldo.')
+      alert('Error al actualizar el saldo: ' + errorUpdate.message)
       return
     }
 
+    // 2. Insertamos en el historial con control de errores explícito
     const { error: errorHistorial } = await supabase
       .from('historial_cuentas')
       .insert([{
@@ -123,14 +125,18 @@ export default function CuentasCorrientesPage() {
         descripcion: descripcionMov.trim() || (tipo === 'fiado' ? 'Nuevo fiado / deuda' : 'Pago parcial o total')
       }])
 
-    if (!errorHistorial) {
-      setMontoMovimiento('')
-      setDescripcionMov('')
-      const clienteActualizado = { ...clienteSeleccionado, saldo_actual: nuevoSaldo }
-      setClienteSeleccionado(clienteActualizado)
-      abrirCliente(clienteActualizado)
-      cargarClientes()
+    if (errorHistorial) {
+      alert('Error al guardar en el historial: ' + errorHistorial.message)
+      return
     }
+
+    // 3. Limpiamos y recargamos si todo salió bien
+    setMontoMovimiento('')
+    setDescripcionMov('')
+    const clienteActualizado = { ...clienteSeleccionado, saldo_actual: nuevoSaldo }
+    setClienteSeleccionado(clienteActualizado)
+    abrirCliente(clienteActualizado)
+    cargarClientes()
   }
 
   const eliminarCliente = async (id: string) => {
@@ -139,6 +145,8 @@ export default function CuentasCorrientesPage() {
     if (!error) {
       setClienteSeleccionado(null)
       cargarClientes()
+    } else {
+      alert('Error al eliminar: ' + error.message)
     }
   }
 
