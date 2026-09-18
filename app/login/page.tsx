@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Lock, Mail, HeartHandshake } from 'lucide-react'
@@ -17,14 +17,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
-  const [frase, setFrase] = useState('')
+  const [frase] = useState(FRASES_AMIGABLES[0])
   const [modoTaparOjos, setModoTaparOjos] = useState(false)
   const router = useRouter()
-
-  useEffect(() => {
-    const fraseAleatoria = FRASES_AMIGABLES[Math.floor(Math.random() * FRASES_AMIGABLES.length)]
-    setFrase(fraseAleatoria)
-  }, [])
 
   const manejarLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,7 +54,7 @@ export default function LoginPage() {
 
     // 3. Libre albedrío para Admins y Super Admins
     if (perfil.rol === 'admin' || perfil.rol === 'super_admin') {
-      window.location.href = '/'
+      router.replace('/')
       return
     }
 
@@ -89,7 +84,7 @@ export default function LoginPage() {
     }
 
     // 5. Si todo está correcto, ingresa limpiamente
-    window.location.href = '/'
+    router.replace('/')
   }
 
   return (

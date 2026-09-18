@@ -6,6 +6,15 @@ import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { ArrowLeft, UserPlus, Trash2, Edit2, X, Check, Clock, Users, AlertCircle } from 'lucide-react'
 
+interface Usuario {
+  id: string
+  email: string
+  nombre_completo?: string | null
+  rol: string
+  hora_inicio: string | null
+  hora_fin: string | null
+}
+
 export default function UsuariosPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,11 +27,22 @@ export default function UsuariosPage() {
   const [cargando, setCargando] = useState(false)
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   
-  const [usuarios, setUsuarios] = useState<any[]>([])
-  const [usuarioEditando, setUsuarioEditando] = useState<any | null>(null)
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null)
 
   useEffect(() => {
-    cargarUsuarios()
+    const cargarUsuariosIniciales = async () => {
+      const { data, error } = await supabase
+        .from('perfiles')
+        .select('*')
+        .order('email', { ascending: true })
+
+      if (!error && data) {
+        setUsuarios(data.filter((u) => u.rol !== 'super_admin'))
+      }
+    }
+
+    void cargarUsuariosIniciales()
   }, [])
 
   const cargarUsuarios = async () => {
@@ -79,8 +99,9 @@ export default function UsuariosPage() {
       setHoraFin('17:00')
       setMostrarFormulario(false)
       cargarUsuarios()
-    } catch (err: any) {
-      setMensaje(`❌ Error: ${err.message || 'No se pudo crear el usuario'}`)
+    } catch (err: unknown) {
+      const mensajeError = err instanceof Error ? err.message : 'No se pudo crear el usuario'
+      setMensaje(`❌ Error: ${mensajeError}`)
     } finally {
       setCargando(false)
     }
@@ -98,8 +119,9 @@ export default function UsuariosPage() {
 
       setMensaje('✅ Usuario eliminado por completo de Supabase')
       cargarUsuarios()
-    } catch (err: any) {
-      setMensaje(`❌ Error al eliminar: ${err.message}`)
+    } catch (err: unknown) {
+      const mensajeError = err instanceof Error ? err.message : 'No se pudo eliminar el usuario'
+      setMensaje(`❌ Error al eliminar: ${mensajeError}`)
     }
   }
 
@@ -122,8 +144,9 @@ export default function UsuariosPage() {
       setMensaje('✅ Usuario actualizado con éxito')
       setUsuarioEditando(null)
       cargarUsuarios()
-    } catch (err: any) {
-      setMensaje(`❌ Error al actualizar: ${err.message}`)
+    } catch (err: unknown) {
+      const mensajeError = err instanceof Error ? err.message : 'No se pudo actualizar el usuario'
+      setMensaje(`❌ Error al actualizar: ${mensajeError}`)
     }
   }
 

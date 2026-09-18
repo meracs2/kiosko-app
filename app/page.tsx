@@ -39,15 +39,14 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
-    // 1. Configuración de Tema (Claro / Oscuro)
-    const temaGuardado = localStorage.getItem('theme') === 'dark'
-    setEsOscuro(temaGuardado)
+    const timeoutId = window.setTimeout(() => {
+      setEsOscuro(localStorage.getItem('theme') === 'dark')
 
-    // 2. Configuración de Estilo Visual
-    const estiloGuardado = localStorage.getItem('ui_style') as 'colorido' | 'minimalista'
-    if (estiloGuardado) {
-      setEstiloVisual(estiloGuardado)
-    }
+      const estiloGuardado = localStorage.getItem('ui_style') as 'colorido' | 'minimalista' | null
+      if (estiloGuardado === 'colorido' || estiloGuardado === 'minimalista') {
+        setEstiloVisual(estiloGuardado)
+      }
+    }, 0)
 
     // 3. Verificación de Sesión y Turno
     const verificarSesionYRol = async () => {
@@ -77,18 +76,18 @@ export default function Home() {
           const ahora = new Date()
           const horaActualStr = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
 
-          let dentroDeHorario = inicio <= fin ? (horaActualStr >= inicio && horaActualStr <= fin) : (horaActualStr >= inicio || horaActualStr <= fin)
+          const dentroDeHorario = inicio <= fin ? (horaActualStr >= inicio && horaActualStr <= fin) : (horaActualStr >= inicio || horaActualStr <= fin)
 
           if (!dentroDeHorario) {
             alert(`⏰ Fuera de turno. Tu horario es de ${inicio} a ${fin} hs.`)
             await supabase.auth.signOut()
-            window.location.href = '/login'
+            router.replace('/login')
             return
           }
         }
 
         setRol(perfil.rol)
-      } catch (err) {
+      } catch {
         setRol('empleado')
       } finally {
         setCargando(false)
@@ -96,6 +95,7 @@ export default function Home() {
     }
 
     verificarSesionYRol()
+    return () => window.clearTimeout(timeoutId)
   }, [router])
 
   const cambiarTema = () => {

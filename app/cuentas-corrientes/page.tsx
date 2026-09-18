@@ -38,7 +38,22 @@ export default function CuentasCorrientesPage() {
   const [cargandoMovs, setCargandoMovs] = useState(false)
 
   useEffect(() => {
-    cargarClientes()
+    const cargarClientesIniciales = async () => {
+      setCargando(true)
+      const { data, error } = await supabase
+        .from('clientes_cuentas')
+        .select('*')
+        .order('nombre', { ascending: true })
+
+      if (error) {
+        console.error('Error al cargar cuentas:', error)
+      } else {
+        setClientes(data || [])
+      }
+      setCargando(false)
+    }
+
+    void cargarClientesIniciales()
   }, [])
 
   const cargarClientes = async () => {

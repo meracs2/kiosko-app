@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { createWorker } from 'tesseract.js'
 import { 
   ArrowLeft, 
@@ -55,12 +54,30 @@ export default function ProveedoresPage() {
   const [escaneando, setEscaneando] = useState(false)
   const [progresoOcr, setProgresoOcr] = useState('')
 
-  const router = useRouter()
-
   useEffect(() => {
-    const temaGuardado = localStorage.getItem('theme') === 'dark'
-    setEsOscuro(temaGuardado)
-    cargarProveedores()
+    const timeoutId = window.setTimeout(() => {
+      setEsOscuro(localStorage.getItem('theme') === 'dark')
+    }, 0)
+
+    const cargarProveedoresIniciales = async () => {
+      setCargando(true)
+      try {
+        const { data, error } = await supabase
+          .from('proveedores')
+          .select('*')
+          .order('nombre', { ascending: true })
+
+        if (error) throw error
+        setProveedores(data || [])
+      } catch (error) {
+        console.error('Error al cargar proveedores:', error)
+      } finally {
+        setCargando(false)
+      }
+    }
+
+    void cargarProveedoresIniciales()
+    return () => window.clearTimeout(timeoutId)
   }, [])
 
   const cargarProveedores = async () => {
@@ -129,9 +146,10 @@ export default function ProveedoresPage() {
       setEscaneando(false)
       abrirModalCrear()
       setNotas(`--- Texto escaneado de factura ---\n${texto}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const mensajeError = error instanceof Error ? error.message : 'Error desconocido'
       console.error("Error al procesar la imagen con OCR:", error)
-      alert(`Error al leer la imagen: ${error.message || 'Error desconocido'}`)
+      alert(`Error al leer la imagen: ${mensajeError}`)
       setEscaneando(false)
     } finally {
       e.target.value = ''

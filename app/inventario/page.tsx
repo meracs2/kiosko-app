@@ -94,7 +94,7 @@ export default function InventarioPage() {
       return
     }
 
-    const payload: any = {
+    const payload = {
       kiosko_id: kioskoId,
       nombre,
       codigo_barras: codigoBarras,

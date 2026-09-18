@@ -71,10 +71,14 @@ export default function CajaPage() {
     }
     inicializarKiosko()
 
-    const cierreGuardado = localStorage.getItem('kiosko_ultimo_cierre')
-    if (cierreGuardado) {
-      setUltimoCierre(Number(cierreGuardado))
-    }
+    const timeoutId = window.setTimeout(() => {
+      const cierreGuardado = localStorage.getItem('kiosko_ultimo_cierre')
+      if (cierreGuardado) {
+        setUltimoCierre(Number(cierreGuardado))
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [])
 
   const ventasDelTurno = ventas.filter((v) => {
@@ -191,6 +195,8 @@ export default function CajaPage() {
     if (!window.confirm('¿Estás seguro de realizar el Cierre de Caja? Esto descargará el Excel y reiniciará los contadores a $0.')) return
 
     descargarReporteExcelLocal()
+    // El cierre se ejecuta desde una acción explícita del usuario.
+    // eslint-disable-next-line react-hooks/purity
     const ahoraMs = Date.now()
     localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
     setUltimoCierre(ahoraMs)

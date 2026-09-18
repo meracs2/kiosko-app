@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { ArrowLeft, BarChart3, PieChart as PieIcon, Flame, Download } from 'lucide-react'
@@ -19,16 +19,17 @@ import {
 
 const COLORES = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6366F1']
 
+interface DatoGrafico {
+  nombre: string
+  cantidad: number
+}
+
 export default function MetricasPage() {
-  const [dataGraficos, setDataGraficos] = useState<any[]>([])
+  const [dataGraficos, setDataGraficos] = useState<DatoGrafico[]>([])
   const [cargando, setCargando] = useState(true)
   const [periodo, setPeriodo] = useState<'hoy' | 'semana' | 'mes'>('mes')
 
-  useEffect(() => {
-    obtenerMetricas()
-  }, [periodo])
-
-  const obtenerMetricas = async () => {
+  const obtenerMetricas = useCallback(async () => {
     setCargando(true)
     try {
       const ahora = new Date()
@@ -42,16 +43,29 @@ export default function MetricasPage() {
         fechaDesde.setDate(ahora.getDate() - 30)
       }
 
-      // IMPORTANTE: Asegurate de filtrar también por kiosko_id si tu tabla detalle_ventas es multi-tenant
+      // Consultamos el detalle uniendo con la tabla ventas para filtrar por fecha (created_at)
       const { data, error } = await supabase
         .from('detalle_ventas')
-        .select('producto_nombre, cantidad, created_at')
-        .gte('created_at', fechaDesde.toISOString())
+        .select(`
+          nombre_producto,
+          cantidad,
+          ventas!inner (
+            created_at
+          )
+        `)
+        .gte('ventas.created_at', fechaDesde.toISOString())
 
-      if (!error && data) {
+      if (error) {
+        console.error('Error al traer métricas:', error)
+        setDataGraficos([])
+        return
+      }
+
+      if (data) {
         const contador: { [key: string]: number } = {}
-        data.forEach((item) => {
-          contador[item.producto_nombre] = (contador[item.producto_nombre] || 0) + item.cantidad
+        data.forEach((item: any) => {
+          const nombre = item.nombre_producto || 'Sin nombre'
+          contador[nombre] = (contador[nombre] || 0) + item.cantidad
         })
 
         const ranking = Object.keys(contador)
@@ -62,10 +76,19 @@ export default function MetricasPage() {
       }
     } catch (err) {
       console.error(err)
+      setDataGraficos([])
     } finally {
       setCargando(false)
     }
-  }
+  }, [periodo])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void obtenerMetricas()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [obtenerMetricas])
 
   const exportarAExcel = () => {
     if (dataGraficos.length === 0) return
