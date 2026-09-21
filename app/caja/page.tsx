@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Lock } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Lock, FileText } from 'lucide-react'
 
 interface DetalleVenta {
   id: string
@@ -71,11 +71,11 @@ export default function CajaPage() {
     }
     inicializarKiosko()
 
+    // REINICIO AUTOMÁTICO A LAS 00:00 HS DE HOY
     const timeoutId = window.setTimeout(() => {
-      const cierreGuardado = localStorage.getItem('kiosko_ultimo_cierre')
-      if (cierreGuardado) {
-        setUltimoCierre(Number(cierreGuardado))
-      }
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0) // Setea a las 00:00:00 hs de hoy
+      setUltimoCierre(hoy.getTime())
     }, 0)
 
     return () => window.clearTimeout(timeoutId)
@@ -186,25 +186,38 @@ export default function CajaPage() {
     document.body.removeChild(link);
   }
 
-  const handleCierreCaja = () => {
+  // 1. BOTÓN: CERRAR TURNO (Actualiza el contador al momento actual)
+  const handleCerrarTurno = () => {
     if (ventasDelTurno.length === 0) {
       alert('No hay ventas registradas en este turno para cerrar.')
       return
     }
+    if (!window.confirm('¿Estás seguro de cerrar el turno actual?')) return
 
-    if (!window.confirm('¿Estás seguro de realizar el Cierre de Caja? Esto descargará el Excel y reiniciará los contadores a $0.')) return
-
-    descargarReporteExcelLocal()
-    // El cierre se ejecuta desde una acción explícita del usuario.
     // eslint-disable-next-line react-hooks/purity
     const ahoraMs = Date.now()
     localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
     setUltimoCierre(ahoraMs)
+    alert('¡Turno cerrado con éxito!')
+  }
+
+  // 2. BOTÓN: GUARDAR ARCHIVO EXCEL
+  const handleGuardarExcel = () => {
+    if (ventasDelTurno.length === 0) {
+      alert('No hay ventas en este turno para exportar.')
+      return
+    }
+    descargarReporteExcelLocal()
+  }
+
+  // 3. BOTÓN: REINICIAR CAJA (Limpia los campos manuales)
+  const handleReiniciarCaja = () => {
+    if (!window.confirm('¿Estás seguro de reiniciar los contadores manuales de caja?')) return
 
     setManualEfectivo('')
     setManualTarjeta('')
     setManualTransf('')
-    alert('¡Caja cerrada y contadores reiniciados con éxito!')
+    alert('¡Caja e inputs manuales reiniciados con éxito!')
   }
 
   return (
@@ -344,13 +357,32 @@ export default function CajaPage() {
               </div>
             )}
 
-            <button
-              onClick={handleCierreCaja}
-              className="w-full mt-5 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 px-4 rounded-2xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
-            >
-              <Lock size={16} />
-              Cerrar Turno y Reiniciar Caja
-            </button>
+            {/* Los 3 Botones Independientes */}
+            <div className="space-y-2.5 mt-5">
+              <button
+                onClick={handleCerrarTurno}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
+              >
+                <Lock size={16} />
+                Cerrar Turno
+              </button>
+
+              <button
+                onClick={handleGuardarExcel}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
+              >
+                <FileText size={16} />
+                Guardar Archivo Excel
+              </button>
+
+              <button
+                onClick={handleReiniciarCaja}
+                className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
+              >
+                <RefreshCw size={16} />
+                Reiniciar Caja
+              </button>
+            </div>
           </div>
         </div>
 

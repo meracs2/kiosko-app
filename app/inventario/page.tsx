@@ -188,7 +188,8 @@ export default function InventarioPage() {
       p.codigo_barras.includes(busquedaStock)
 
     if (filtroCategoria === 'todos') return coincideTexto
-    if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 1
+    // Cambiado de <= 1 a <= 0 para detectar cuando no hay stock
+    if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 0
     
     const catProducto = (p.categoria || 'Otros').toLowerCase()
     
@@ -202,7 +203,8 @@ export default function InventarioPage() {
     return coincideTexto && (coincideCat || coincideEnNombre)
   })
 
-  const cantidadStockBajo = productos.filter(p => p.stock_actual <= 1).length
+  // Conteo de productos sin stock (0 unidades)
+  const cantidadStockBajo = productos.filter(p => p.stock_actual <= 0).length
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-8 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
@@ -225,7 +227,7 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* ALERTA DE STOCK BAJO */}
+      {/* ALERTA DE SIN STOCK */}
       {cantidadStockBajo > 0 && !cerrarAlertaStock && (
         <div className="mb-6 bg-amber-50 border border-amber-200/80 p-4 rounded-2xl shadow-xs flex items-center justify-between gap-3 transition-all">
           <div className="flex items-center gap-3">
@@ -233,8 +235,8 @@ export default function InventarioPage() {
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="text-xs sm:text-sm font-bold text-amber-900">¡Atención! Hay {cantidadStockBajo} producto(s) con stock crítico</p>
-              <p className="text-xs text-amber-700/90">Te queda 1 unidad o ninguna disponible en inventario.</p>
+              <p className="text-xs sm:text-sm font-bold text-amber-900">¡Atención! Hay {cantidadStockBajo} producto(s) sin stock</p>
+              <p className="text-xs text-amber-700/90">Se quedaron sin unidades disponibles en inventario (0 un.).</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -242,7 +244,7 @@ export default function InventarioPage() {
               onClick={() => setFiltroCategoria('bajo')}
               className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs active:scale-95"
             >
-              Ver stock bajo
+              Ver sin stock
             </button>
             <button
               onClick={() => setCerrarAlertaStock(true)}
@@ -405,7 +407,7 @@ export default function InventarioPage() {
                 filtroCategoria === 'bajo' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/50'
               }`}
             >
-              ⚠️ Stock Bajo
+              ⚠️ Sin Stock (0)
             </button>
             {CATEGORIAS.map((cat) => (
               <button
@@ -442,7 +444,7 @@ export default function InventarioPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
                   {productosFiltrados.map((prod) => {
-                    const esStockBajo = prod.stock_actual <= 1
+                    const sinStock = prod.stock_actual <= 0
                     return (
                       <tr key={prod.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="py-3.5 px-4 font-semibold text-slate-800">
@@ -459,9 +461,9 @@ export default function InventarioPage() {
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs ${
-                            esStockBajo ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-700'
+                            sinStock ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-700'
                           }`}>
-                            {esStockBajo && <AlertTriangle size={12} />}
+                            {sinStock && <AlertTriangle size={12} />}
                             {prod.stock_actual} un.
                           </span>
                         </td>

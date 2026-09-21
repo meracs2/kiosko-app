@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from 'next'
 import './globals.css' // Importa tus estilos de Tailwind si tenés este archivo
+import RecordatorioCierre from '@/components/RecordatorioCierre' // (Ajustá la ruta según donde hayas guardado el archivo anterior)
 
 export const metadata: Metadata = {
   title: 'Kiosko POS',
@@ -15,7 +16,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className="antialiased bg-slate-50">{children}</body>
+      <body className="antialiased bg-slate-50">
+        {children}
+        <RecordatorioCierre />
+      </body>
     </html>
   )
 }

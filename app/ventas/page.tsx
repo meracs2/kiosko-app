@@ -303,6 +303,7 @@ export default function VentasPage() {
 
     const ventaId = ventaInsertada[0].id
 
+    // MODIFICADO: Ahora guarda el detalle exacto de los productos en el historial de cuentas
     if (valCtaCte > 0 && clienteSeleccionado) {
       const nuevoSaldo = clienteSeleccionado.saldo_actual + valCtaCte
 
@@ -311,11 +312,13 @@ export default function VentasPage() {
         .update({ saldo_actual: nuevoSaldo })
         .eq('id', clienteSeleccionado.id)
 
+      const detalleProductos = carrito.map(item => `${item.cantidad}x ${item.nombre}`).join(', ')
+
       await supabase.from('historial_cuentas').insert([{
         cliente_id: clienteSeleccionado.id,
         tipo: 'fiado',
         monto: valCtaCte,
-        descripcion: `Compra en Venta #${ventaId.slice(0, 8)}`
+        descripcion: `Compra: ${detalleProductos}`
       }])
     }
 
