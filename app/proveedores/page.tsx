@@ -18,7 +18,8 @@ import {
   X, 
   Building2,
   Camera,
-  Loader2
+  Loader2,
+  DollarSign
 } from 'lucide-react'
 
 interface Proveedor {
@@ -37,11 +38,9 @@ export default function ProveedoresPage() {
   const [busqueda, setBusqueda] = useState('')
   const [esOscuro, setEsOscuro] = useState(false)
 
-  // Estados para modal de crear / editar
+  // Estados para modal de crear / editar proveedor
   const [mostrarModal, setMostrarModal] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
-  
-  // Campos del formulario
   const [nombre, setNombre] = useState('')
   const [contacto, setContacto] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -49,6 +48,12 @@ export default function ProveedoresPage() {
   const [direccion, setDireccion] = useState('')
   const [notas, setNotas] = useState('')
   const [guardando, setGuardando] = useState(false)
+
+  // Estados para modal de Registrar Gasto
+  const [mostrarModalGasto, setMostrarModalGasto] = useState(false)
+  const [descripcionGasto, setDescripcionGasto] = useState('')
+  const [montoGasto, setMontoGasto] = useState('')
+  const [guardandoGasto, setGuardandoGasto] = useState(false)
 
   // Estados del OCR (Escáner de imágenes)
   const [escaneando, setEscaneando] = useState(false)
@@ -119,7 +124,6 @@ export default function ProveedoresPage() {
     setMostrarModal(true)
   }
 
-  // Escáner OCR exclusivo para imágenes (fotos de facturas/remitos)
   const procesarArchivoOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivo = e.target.files?.[0]
     if (!archivo) return
@@ -216,6 +220,42 @@ export default function ProveedoresPage() {
     }
   }
 
+  // LOGICA DEL NUEVO GASTO
+  const registrarGasto = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!descripcionGasto.trim() || !montoGasto) {
+      alert('Por favor, ingresá la descripción y el monto.')
+      return
+    }
+
+    setGuardandoGasto(true)
+    try {
+      // Forzamos el monto a negativo para que reste de la caja
+      const montoNegativo = -Math.abs(Number(montoGasto))
+
+      // Ajustá 'movimientos_caja' al nombre real de la tabla donde guardás las transacciones
+      const { error } = await supabase
+        .from('movimientos_caja')
+        .insert([{
+          tipo_movimiento: 'gasto',
+          descripcion: descripcionGasto.trim(),
+          monto: montoNegativo
+        }])
+
+      if (error) throw error
+
+      setMostrarModalGasto(false)
+      setDescripcionGasto('')
+      setMontoGasto('')
+      alert('Gasto registrado y descontado de la caja exitosamente.')
+    } catch (error) {
+      console.error('Error al registrar gasto:', error)
+      alert('Hubo un error al registrar el gasto.')
+    } finally {
+      setGuardandoGasto(false)
+    }
+  }
+
   const proveedoresFiltrados = proveedores.filter(p => 
     p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
     (p.contacto && p.contacto.toLowerCase().includes(busqueda.toLowerCase())) ||
@@ -250,6 +290,15 @@ export default function ProveedoresPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* BOTÓN REGISTRAR GASTO */}
+          <button
+            onClick={() => setMostrarModalGasto(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition text-xs shadow-sm cursor-pointer"
+          >
+            <DollarSign size={16} />
+            <span className="hidden sm:inline">Registrar Gasto</span>
+          </button>
+
           {/* BOTÓN ESCÁNER DE FOTO */}
           <label className={`flex items-center gap-1.5 px-4 py-2.5 font-bold rounded-xl transition text-xs shadow-sm cursor-pointer ${escaneando ? 'bg-emerald-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}>
             {escaneando ? (
@@ -260,7 +309,7 @@ export default function ProveedoresPage() {
             ) : (
               <>
                 <Camera size={16} />
-                <span>Escanear Foto de Factura</span>
+                <span className="hidden sm:inline">Escanear Factura</span>
               </>
             )}
             <input 
@@ -278,7 +327,7 @@ export default function ProveedoresPage() {
             className="flex items-center gap-1.5 px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold rounded-xl transition text-xs shadow-sm cursor-pointer"
           >
             <Plus size={16} />
-            <span>Nuevo Proveedor</span>
+            <span className="hidden sm:inline">Nuevo Proveedor</span>
           </button>
         </div>
       </header>
@@ -396,6 +445,70 @@ export default function ProveedoresPage() {
         )}
 
       </main>
+
+      {/* MODAL REGISTRAR GASTO */}
+      {mostrarModalGasto && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md rounded-2xl p-6 relative shadow-xl border ${bgCard}`}>
+            <div className={`flex justify-between items-center mb-4 pb-3 border-b ${esOscuro ? 'border-slate-800' : 'border-slate-100'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-red-500/20 text-red-500 rounded-xl"><DollarSign size={18} /></div>
+                <div>
+                  <h3 className="font-bold text-sm">Registrar Gasto</h3>
+                  <p className={`text-[11px] font-medium ${textMuted}`}>Se restará del total de la caja de hoy</p>
+                </div>
+              </div>
+              <button onClick={() => setMostrarModalGasto(false)} className={`p-1.5 rounded-full transition-colors cursor-pointer ${esOscuro ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={registrarGasto} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold mb-1">Descripción del gasto *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Compra Coca Cola al proveedor"
+                  value={descripcionGasto}
+                  onChange={(e) => setDescripcionGasto(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border outline-none transition focus:ring-2 focus:ring-red-500 ${inputBg}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Monto a restar ($) *</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="Ej: 5000"
+                  value={montoGasto}
+                  onChange={(e) => setMontoGasto(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border outline-none transition focus:ring-2 focus:ring-red-500 ${inputBg}`}
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarModalGasto(false)}
+                  className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition border cursor-pointer ${esOscuro ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'}`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoGasto}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-red-500 hover:bg-red-600 text-white transition cursor-pointer disabled:opacity-50"
+                >
+                  {guardandoGasto ? 'Guardando...' : 'Guardar Gasto'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL CREAR / EDITAR PROVEEDOR */}
       {mostrarModal && (
