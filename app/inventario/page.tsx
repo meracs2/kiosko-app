@@ -99,7 +99,6 @@ export default function InventarioPage() {
     if (esFraccionable && !precioVentaModificadoManual) {
       const costoG = parseFloat(precioCostoGramo)
       if (!isNaN(costoG) && costoG > 0) {
-        // Multiplicamos por 100 para sacar el precio sugerido de 100g
         const sugerido = (costoG * 100).toFixed(2)
         setPrecioVenta100g(sugerido)
       } else {
@@ -185,7 +184,7 @@ export default function InventarioPage() {
     const costoGramoActual = prod.precio_costo_100g ? (prod.precio_costo_100g / 100).toString() : ''
     setEditPrecioCostoGramo(costoGramoActual)
     setEditPrecioVenta100g(prod.precio_venta_100g ? prod.precio_venta_100g.toString() : '')
-    setEditPrecioVentaModificadoManual(true) // Al abrir un producto existente, tratamos el precio como establecido
+    setEditPrecioVentaModificadoManual(true)
   }
 
   const guardarEdicionModal = async (e: React.FormEvent) => {
@@ -414,7 +413,6 @@ export default function InventarioPage() {
               </div>
             )}
 
-            {/* PRECIOS DIFERENCIADOS: COSTO POR GRAMO Y VENTA POR 100G (CON CÁLCULO AUTOMÁTICO) */}
             {categoria === 'Fiambres y Quesos' && esFraccionable ? (
               <div className="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-2.5">
                 <div className="grid grid-cols-2 gap-3">
@@ -449,7 +447,7 @@ export default function InventarioPage() {
                       value={precioVenta100g}
                       onChange={(e) => {
                         setPrecioVenta100g(e.target.value)
-                        setPrecioVentaModificadoManual(true) // Permitir sobreescribir libremente (ej. poner 1100)
+                        setPrecioVentaModificadoManual(true)
                       }}
                       placeholder="Ej: 1000"
                       required
@@ -526,7 +524,7 @@ export default function InventarioPage() {
             </div>
           </div>
 
-          {/* FILTROS */}
+          {/* FILTROS ACTUALIZADOS (INCLUYE FIAMBRES Y QUESOS) */}
           <div className="flex gap-1.5 overflow-x-auto pb-3 mb-4 text-xs scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
             <button
               onClick={() => setFiltroCategoria('todos')}
@@ -542,7 +540,7 @@ export default function InventarioPage() {
                 filtroCategoria === 'bajo' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/50'
               }`}
             >
-              ⚠️️ Sin Stock (0)
+              ⚠ Sin Stock (0)
             </button>
             {CATEGORIAS.map((cat) => (
               <button
@@ -796,7 +794,7 @@ export default function InventarioPage() {
                   type="submit"
                   className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                 >
-                  <Check size5 size={16} /> Guardar Cambios
+                  <Check size={16} /> Guardar Cambios
                 </button>
               </div>
             </form>
@@ -834,7 +832,7 @@ export default function InventarioPage() {
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-bold text-slate-800 text-sm">Escaneá el nuevo código</h3>
               <button onClick={() => setMostrarEscanerModal(false)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600">
-                <X size5 size={18} />
+                <X size={18} />
               </button>
             </div>
             <div className="overflow-hidden rounded-xl">
