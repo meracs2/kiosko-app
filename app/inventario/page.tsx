@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Scanner from '@/components/Scanner'
 import Link from 'next/link'
-import { Camera, Plus, Trash2, ArrowLeft, Search, AlertTriangle, X, Edit2, Check, Package, DollarSign, Layers } from 'lucide-react'
+import { Camera, Plus, Trash2, ArrowLeft, Search, AlertTriangle, X, Edit2, Check, Package, DollarSign, Layers, RotateCcw } from 'lucide-react'
 
 interface Producto {
   id: string
@@ -13,6 +13,9 @@ interface Producto {
   precio: number
   stock_actual: number
   categoria?: string
+  es_fraccionable?: boolean
+  precio_costo_100g?: number
+  precio_venta_100g?: number
 }
 
 const CATEGORIAS = [
@@ -20,6 +23,7 @@ const CATEGORIAS = [
   'Galletitas',
   'Lácteos',
   'Comida',
+  'Fiambres y Quesos',
   'Higiene Personal',
   'Limpieza',
   'Otros'
@@ -35,6 +39,12 @@ export default function InventarioPage() {
   const [stock, setStock] = useState('')
   const [categoria, setCategoria] = useState('Bebidas')
   
+  // ESTADOS PARA PRODUCTOS FRACCIONABLES
+  const [esFraccionable, setEsFraccionable] = useState(false)
+  const [precioCostoGramo, setPrecioCostoGramo] = useState('') 
+  const [precioVenta100g, setPrecioVenta100g] = useState('')
+  const [precioVentaModificadoManual, setPrecioVentaModificadoManual] = useState(false)
+  
   const [busquedaStock, setBusquedaStock] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('todos')
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
@@ -49,6 +59,10 @@ export default function InventarioPage() {
   const [editPrecio, setEditPrecio] = useState('')
   const [editStock, setEditStock] = useState('')
   const [editCategoria, setEditCategoria] = useState('Bebidas')
+  const [editEsFraccionable, setEditEsFraccionable] = useState(false)
+  const [editPrecioCostoGramo, setEditPrecioCostoGramo] = useState('') 
+  const [editPrecioVenta100g, setEditPrecioVenta100g] = useState('')
+  const [editPrecioVentaModificadoManual, setEditPrecioVentaModificadoManual] = useState(false)
   const [mostrarEscanerModal, setMostrarEscanerModal] = useState(false)
 
   const fetchProductos = async (idKiosko: string) => {
@@ -80,6 +94,33 @@ export default function InventarioPage() {
     inicializarKiosko()
   }, [])
 
+  // EFECTO DE CÁLCULO AUTOMÁTICO PARA NUEVO PRODUCTO
+  useEffect(() => {
+    if (esFraccionable && !precioVentaModificadoManual) {
+      const costoG = parseFloat(precioCostoGramo)
+      if (!isNaN(costoG) && costoG > 0) {
+        // Multiplicamos por 100 para sacar el precio sugerido de 100g
+        const sugerido = (costoG * 100).toFixed(2)
+        setPrecioVenta100g(sugerido)
+      } else {
+        setPrecioVenta100g('')
+      }
+    }
+  }, [precioCostoGramo, esFraccionable, precioVentaModificadoManual])
+
+  // EFECTO DE CÁLCULO AUTOMÁTICO PARA EL MODAL DE EDICIÓN
+  useEffect(() => {
+    if (editEsFraccionable && !editPrecioVentaModificadoManual) {
+      const costoG = parseFloat(editPrecioCostoGramo)
+      if (!isNaN(costoG) && costoG > 0) {
+        const sugerido = (costoG * 100).toFixed(2)
+        setEditPrecioVenta100g(sugerido)
+      } else {
+        setEditPrecioVenta100g('')
+      }
+    }
+  }, [editPrecioCostoGramo, editEsFraccionable, editPrecioVentaModificadoManual])
+
   const guardarProductoNuevo = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!kioskoId) return
@@ -94,13 +135,19 @@ export default function InventarioPage() {
       return
     }
 
+    const esFiambreValido = categoria === 'Fiambres y Quesos' && esFraccionable
+    const costo100gCalculado = esFiambreValido ? parseFloat(precioCostoGramo || '0') * 100 : null
+
     const payload = {
       kiosko_id: kioskoId,
       nombre,
       codigo_barras: codigoBarras,
-      precio: parseFloat(precio),
+      precio: esFiambreValido ? parseFloat(precioVenta100g || '0') : parseFloat(precio),
       stock_actual: parseInt(stock),
-      categoria: categoria
+      categoria: categoria,
+      es_fraccionable: esFiambreValido,
+      precio_costo_100g: costo100gCalculado,
+      precio_venta_100g: esFiambreValido ? parseFloat(precioVenta100g || '0') : null
     }
 
     const { error } = await supabase.from('productos').insert([payload])
@@ -121,6 +168,10 @@ export default function InventarioPage() {
     setPrecio('')
     setStock('')
     setCategoria('Bebidas')
+    setEsFraccionable(false)
+    setPrecioCostoGramo('')
+    setPrecioVenta100g('')
+    setPrecioVentaModificadoManual(false)
   }
 
   const abrirModalEdicion = (prod: Producto) => {
@@ -129,26 +180,34 @@ export default function InventarioPage() {
     setEditPrecio(prod.precio.toString())
     setEditStock(prod.stock_actual.toString())
     setEditCategoria(prod.categoria || 'Bebidas')
+    setEditEsFraccionable(prod.es_fraccionable || false)
+    
+    const costoGramoActual = prod.precio_costo_100g ? (prod.precio_costo_100g / 100).toString() : ''
+    setEditPrecioCostoGramo(costoGramoActual)
+    setEditPrecioVenta100g(prod.precio_venta_100g ? prod.precio_venta_100g.toString() : '')
+    setEditPrecioVentaModificadoManual(true) // Al abrir un producto existente, tratamos el precio como establecido
   }
 
   const guardarEdicionModal = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!kioskoId || !productoEditando) return
 
-    const nuevoPrecio = parseFloat(editPrecio)
+    const esFiambreValidoModal = editCategoria === 'Fiambres y Quesos' && editEsFraccionable
     const nuevoStock = parseInt(editStock)
+    const nuevoPrecio = esFiambreValidoModal ? parseFloat(editPrecioVenta100g) : parseFloat(editPrecio)
 
-    if (isNaN(nuevoPrecio) || isNaN(nuevoStock)) {
+    if (isNaN(nuevoStock) || isNaN(nuevoPrecio)) {
       alert('Por favor, ingresá valores válidos.')
       return
     }
 
-    // Verificar si el nuevo código ya lo tiene otro producto diferente
     const codigoOcupado = productos.find(p => p.codigo_barras === editCodigo.trim() && p.id !== productoEditando.id)
     if (codigoOcupado) {
       alert(`⚠️ El código "${editCodigo}" ya está asignado a otro producto: ${codigoOcupado.nombre}`)
       return
     }
+
+    const costo100gModalCalculado = esFiambreValidoModal ? parseFloat(editPrecioCostoGramo || '0') * 100 : null
 
     const { error } = await supabase
       .from('productos')
@@ -156,7 +215,10 @@ export default function InventarioPage() {
         codigo_barras: editCodigo.trim(),
         precio: nuevoPrecio,
         stock_actual: nuevoStock,
-        categoria: editCategoria
+        categoria: editCategoria,
+        es_fraccionable: esFiambreValidoModal,
+        precio_costo_100g: costo100gModalCalculado,
+        precio_venta_100g: esFiambreValidoModal ? parseFloat(editPrecioVenta100g || '0') : null
       })
       .eq('id', productoEditando.id)
       .eq('kiosko_id', kioskoId)
@@ -188,13 +250,12 @@ export default function InventarioPage() {
       p.codigo_barras.includes(busquedaStock)
 
     if (filtroCategoria === 'todos') return coincideTexto
-    // Cambiado de <= 1 a <= 0 para detectar cuando no hay stock
     if (filtroCategoria === 'bajo') return coincideTexto && p.stock_actual <= 0
     
     const catProducto = (p.categoria || 'Otros').toLowerCase()
     
     if (filtroCategoria === 'Otros') {
-      return coincideTexto && (catProducto === 'otros' || !CATEGORIAS.slice(0, 6).map(c => c.toLowerCase()).includes(catProducto))
+      return coincideTexto && (catProducto === 'otros' || !CATEGORIAS.slice(0, 7).map(c => c.toLowerCase()).includes(catProducto))
     }
     
     const coincideCat = catProducto === filtroCategoria.toLowerCase()
@@ -203,7 +264,6 @@ export default function InventarioPage() {
     return coincideTexto && (coincideCat || coincideEnNombre)
   })
 
-  // Conteo de productos sin stock (0 unidades)
   const cantidadStockBajo = productos.filter(p => p.stock_actual <= 0).length
 
   return (
@@ -305,7 +365,7 @@ export default function InventarioPage() {
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: Coca Cola 2.25L"
+                placeholder="Ej: Jamón Cocido / Queso Tybo"
                 required
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
@@ -316,7 +376,15 @@ export default function InventarioPage() {
               <div className="relative">
                 <select
                   value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
+                  onChange={(e) => {
+                    const nuevaCat = e.target.value
+                    setCategoria(nuevaCat)
+                    if (nuevaCat === 'Fiambres y Quesos') {
+                      setEsFraccionable(true)
+                    } else {
+                      setEsFraccionable(false)
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none"
                 >
                   {CATEGORIAS.map((cat) => (
@@ -331,9 +399,73 @@ export default function InventarioPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {categoria === 'Fiambres y Quesos' && (
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 flex items-center gap-2.5 animate-fadeIn">
+                <input
+                  type="checkbox"
+                  id="esFraccionable"
+                  checked={esFraccionable}
+                  onChange={(e) => setEsFraccionable(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                />
+                <label htmlFor="esFraccionable" className="text-xs font-bold text-slate-700 cursor-pointer">
+                  Se vende por peso / porción (ej. Fiambrería)
+                </label>
+              </div>
+            )}
+
+            {/* PRECIOS DIFERENCIADOS: COSTO POR GRAMO Y VENTA POR 100G (CON CÁLCULO AUTOMÁTICO) */}
+            {categoria === 'Fiambres y Quesos' && esFraccionable ? (
+              <div className="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-2.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-blue-900 mb-1" title="Costo exacto por cada 1 gramo">Costo x 1g ($)</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={precioCostoGramo}
+                      onChange={(e) => setPrecioCostoGramo(e.target.value)}
+                      placeholder="Ej: 10"
+                      className="w-full px-3 py-2 border border-blue-200 rounded-xl bg-white text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/20 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold text-blue-900">Venta x 100g ($)</label>
+                      {precioVentaModificadoManual && (
+                        <button
+                          type="button"
+                          onClick={() => setPrecioVentaModificadoManual(false)}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-0.5"
+                          title="Volver a calcular automáticamente según el costo"
+                        >
+                          <RotateCcw size={10} /> Auto
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={precioVenta100g}
+                      onChange={(e) => {
+                        setPrecioVenta100g(e.target.value)
+                        setPrecioVentaModificadoManual(true) // Permitir sobreescribir libremente (ej. poner 1100)
+                      }}
+                      placeholder="Ej: 1000"
+                      required
+                      className="w-full px-3 py-2 border border-blue-200 rounded-xl bg-white text-slate-800 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none"
+                    />
+                  </div>
+                </div>
+                {!precioVentaModificadoManual && precioCostoGramo && (
+                  <p className="text-[10px] text-blue-600/90 font-medium italic">
+                    💡 Calculado automáticamente (x100g). Podés modificarlo manualmente si deseás sumar un extra.
+                  </p>
+                )}
+              </div>
+            ) : (
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Precio ($)</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Precio Unitario ($)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -347,17 +479,20 @@ export default function InventarioPage() {
                   <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Stock Inicial</label>
-                <input
-                  type="number"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="10"
-                  required
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                />
-              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                {categoria === 'Fiambres y Quesos' && esFraccionable ? 'Stock Inicial en Gramos (ej. 4000g de horma)' : 'Stock Inicial (Unidades)'}
+              </label>
+              <input
+                type="number"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                placeholder={categoria === 'Fiambres y Quesos' && esFraccionable ? '4000' : '10'}
+                required
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              />
             </div>
 
             <button
@@ -407,7 +542,7 @@ export default function InventarioPage() {
                 filtroCategoria === 'bajo' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/50'
               }`}
             >
-              ⚠️ Sin Stock (0)
+              ⚠️️ Sin Stock (0)
             </button>
             {CATEGORIAS.map((cat) => (
               <button
@@ -448,7 +583,12 @@ export default function InventarioPage() {
                     return (
                       <tr key={prod.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="py-3.5 px-4 font-semibold text-slate-800">
-                          <div className="max-w-[200px] truncate" title={prod.nombre}>{prod.nombre}</div>
+                          <div className="max-w-[200px] truncate flex items-center gap-1.5" title={prod.nombre}>
+                            {prod.nombre}
+                            {prod.es_fraccionable && (
+                              <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-200">Peso</span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-4 text-slate-400 font-mono text-xs">{prod.codigo_barras}</td>
                         <td className="py-3.5 px-4">
@@ -457,14 +597,20 @@ export default function InventarioPage() {
                           </span>
                         </td>
                         <td className="py-3.5 px-4 font-bold text-emerald-600">
-                          ${prod.precio.toFixed(2)}
+                          {prod.es_fraccionable ? (
+                            <span title="Precio de venta por cada 100 gramos">
+                              ${prod.precio_venta_100g?.toFixed(2)} <span className="text-[10px] text-slate-500 font-normal">/100g</span>
+                            </span>
+                          ) : (
+                            `$${prod.precio.toFixed(2)}`
+                          )}
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs ${
                             sinStock ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-700'
                           }`}>
                             {sinStock && <AlertTriangle size={12} />}
-                            {prod.stock_actual} un.
+                            {prod.es_fraccionable ? `${prod.stock_actual}g` : `${prod.stock_actual} un.`}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right">
@@ -496,10 +642,10 @@ export default function InventarioPage() {
 
       </div>
 
-      {/* MODAL DE EDICIÓN (CÓDIGO, CATEGORÍA, PRECIO Y STOCK) */}
+      {/* MODAL DE EDICIÓN */}
       {productoEditando && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative shadow-2xl border border-slate-100">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 relative shadow-2xl border border-slate-100">
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Modificar Producto</h3>
@@ -521,15 +667,13 @@ export default function InventarioPage() {
                     type="text"
                     value={editCodigo}
                     onChange={(e) => setEditCodigo(e.target.value)}
-                    placeholder="Escaneá o tipeá nuevo código"
                     required
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-mono focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setMostrarEscanerModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-xs active:scale-95"
-                    title="Escanear con cámara"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 rounded-xl flex items-center justify-center shrink-0 active:scale-95"
                   >
                     <Camera size={18} />
                   </button>
@@ -538,47 +682,105 @@ export default function InventarioPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Categoría</label>
-                <div className="relative">
-                  <select
-                    value={editCategoria}
-                    onChange={(e) => setEditCategoria(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none"
-                  >
-                    {CATEGORIAS.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                    <Layers size={16} />
-                  </div>
-                </div>
+                <select
+                  value={editCategoria}
+                  onChange={(e) => {
+                    const nuevaCat = e.target.value
+                    setEditCategoria(nuevaCat)
+                    if (nuevaCat === 'Fiambres y Quesos') {
+                      setEditEsFraccionable(true)
+                    } else {
+                      setEditEsFraccionable(false)
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none"
+                >
+                  {CATEGORIAS.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nuevo Precio ($)</label>
-                <div className="relative">
+              {editCategoria === 'Fiambres y Quesos' && (
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="editEsFraccionable"
+                    checked={editEsFraccionable}
+                    onChange={(e) => setEditEsFraccionable(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                  />
+                  <label htmlFor="editEsFraccionable" className="text-xs font-bold text-slate-700 cursor-pointer">
+                    Se vende por peso / porción (gramos)
+                  </label>
+                </div>
+              )}
+
+              {editCategoria === 'Fiambres y Quesos' && editEsFraccionable ? (
+                <div className="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-2.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-blue-900 mb-1">Costo x 1g ($)</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={editPrecioCostoGramo}
+                        onChange={(e) => setEditPrecioCostoGramo(e.target.value)}
+                        className="w-full px-3 py-2 border border-blue-200 rounded-xl bg-white text-slate-800 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-blue-900">Venta x 100g ($)</label>
+                        {editPrecioVentaModificadoManual && (
+                          <button
+                            type="button"
+                            onClick={() => setEditPrecioVentaModificadoManual(false)}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-0.5"
+                            title="Volver a calcular automáticamente según el costo"
+                          >
+                            <RotateCcw size={10} /> Auto
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editPrecioVenta100g}
+                        onChange={(e) => {
+                          setEditPrecioVenta100g(e.target.value)
+                          setEditPrecioVentaModificadoManual(true)
+                        }}
+                        required
+                        className="w-full px-3 py-2 border border-blue-200 rounded-xl bg-white text-slate-800 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nuevo Precio Unitario ($)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={editPrecio}
                     onChange={(e) => setEditPrecio(e.target.value)}
                     required
-                    className="w-full pl-8 pr-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none"
                   />
-                  <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                 </div>
-              </div>
+              )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nuevo Stock (unidades)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  {editCategoria === 'Fiambres y Quesos' && editEsFraccionable ? 'Stock en Gramos (g)' : 'Stock (unidades)'}
+                </label>
                 <input
                   type="number"
                   value={editStock}
                   onChange={(e) => setEditStock(e.target.value)}
                   required
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none"
                 />
               </div>
 
@@ -594,7 +796,7 @@ export default function InventarioPage() {
                   type="submit"
                   className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                 >
-                  <Check size={16} /> Guardar Cambios
+                  <Check size5 size={16} /> Guardar Cambios
                 </button>
               </div>
             </form>
@@ -602,17 +804,14 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* MODAL DE ESCÁNER PARA NUEVO PRODUCTO */}
+      {/* MODAL DE ESCÁNER NUEVO */}
       {mostrarEscaner && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-2xl border border-slate-100">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-bold text-slate-800 text-sm">Escaneá el código</h3>
-              <button
-                onClick={() => setMostrarEscaner(false)}
-                className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors"
-              >
-                <X size= {18} />
+              <button onClick={() => setMostrarEscaner(false)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600">
+                <X size={18} />
               </button>
             </div>
             <div className="overflow-hidden rounded-xl">
@@ -628,17 +827,14 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* MODAL DE ESCÁNER DENTRO DEL MODAL DE EDICIÓN */}
+      {/* MODAL DE ESCÁNER EDICIÓN */}
       {mostrarEscanerModal && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-4 relative shadow-2xl border border-slate-100">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-bold text-slate-800 text-sm">Escaneá el nuevo código</h3>
-              <button
-                onClick={() => setMostrarEscanerModal(false)}
-                className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors"
-              >
-                <X size={18} />
+              <button onClick={() => setMostrarEscanerModal(false)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600">
+                <X size5 size={18} />
               </button>
             </div>
             <div className="overflow-hidden rounded-xl">

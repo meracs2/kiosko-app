@@ -13,6 +13,8 @@ interface ItemInventario {
   precio: number
   stock_actual?: number
   esPromo?: boolean
+  es_fraccionable?: boolean
+  precio_venta_100g?: number
 }
 
 interface ItemCarrito extends ItemInventario {
@@ -44,6 +46,11 @@ export default function VentasPage() {
   const [sueltoNombre, setSueltoNombre] = useState('')
   const [sueltoPrecio, setSueltoPrecio] = useState('')
   const [sueltoGuardarInventario, setSueltoGuardarInventario] = useState(false)
+
+  // Estados para el Modal de Producto Fraccionable por Peso
+  const [mostrarModalPeso, setMostrarModalPeso] = useState(false)
+  const [productoAFraccionar, setProductoAFraccionar] = useState<ItemInventario | null>(null)
+  const [gramosInput, setGramosInput] = useState('100')
 
   const [pagoEfectivo, setPagoEfectivo] = useState('')
   const [pagoTarjeta, setPagoTarjeta] = useState('')
@@ -104,6 +111,14 @@ export default function VentasPage() {
   const inventarioTotal = [...productos, ...promociones]
 
   const agregarAlCarrito = (item: ItemInventario) => {
+    // Si el producto es fraccionable, abrimos el modal pidiendo gramos
+    if (item.es_fraccionable) {
+      setProductoAFraccionar(item)
+      setGramosInput('100')
+      setMostrarModalPeso(true)
+      return
+    }
+
     setCarrito((prev) => {
       const existe = prev.find((i) => i.id === item.id && i.esPromo === item.esPromo)
       if (existe) {
@@ -117,6 +132,38 @@ export default function VentasPage() {
     setMensaje('')
   }
 
+  const confirmarPesoFraccionable = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!productoAFraccionar) return
+
+    const gramos = parseFloat(gramosInput)
+    if (isNaN(gramos) || gramos <= 0) {
+      setMensaje('⚠️ Ingresá una cantidad de gramos válida.')
+      return
+    }
+
+    const precio100g = productoAFraccionar.precio_venta_100g || productoAFraccionar.precio
+    const precioFinal = (gramos / 100) * precio100g
+    const idUnico = `${productoAFraccionar.id}-${Date.now()}`
+
+    setCarrito((prev) => [
+      ...prev,
+      {
+        ...productoAFraccionar,
+        id: idUnico,
+        nombre: `${productoAFraccionar.nombre} (${gramos}g)`,
+        precio: precioFinal,
+        cantidad: 1
+      }
+    ])
+
+    setMostrarModalPeso(false)
+    setProductoAFraccionar(null)
+    setGramosInput('100')
+    setBusqueda('')
+    setMensaje(`¡${productoAFraccionar.nombre} (${gramos}g) agregado con éxito!`)
+  }
+
   // Manejador para agregar producto suelto o carga rápida
   const manejarProductoSuelto = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -128,7 +175,6 @@ export default function VentasPage() {
 
     let productoId = 'suelto-' + Date.now()
 
-    // Si el usuario marca la opción de guardarlo permanentemente en el inventario
     if (sueltoGuardarInventario && kioskoId) {
       const { data, error } = await supabase.from('productos').insert([{
         kiosko_id: kioskoId,
@@ -141,7 +187,6 @@ export default function VentasPage() {
 
       if (!error && data) {
         productoId = String(data.id)
-        // Actualizar estado local de productos
         setProductos(prev => [{
           id: productoId,
           nombre: sueltoNombre.trim(),
@@ -303,7 +348,6 @@ export default function VentasPage() {
 
     const ventaId = ventaInsertada[0].id
 
-    // MODIFICADO: Ahora guarda el detalle exacto de los productos en el historial de cuentas
     if (valCtaCte > 0 && clienteSeleccionado) {
       const nuevoSaldo = clienteSeleccionado.saldo_actual + valCtaCte
 
@@ -324,7 +368,7 @@ export default function VentasPage() {
 
     for (const item of carrito) {
       const isCustomSuelto = String(item.id).startsWith('suelto-')
-      const idLimpio = (item.esPromo || isCustomSuelto) ? null : parseInt(String(item.id), 10)
+      const idLimpio = (item.esPromo || isCustomSuelto || String(item.id).includes('-')) ? null : parseInt(String(item.id), 10)
 
       const detalleData = {
         venta_id: ventaId,
@@ -497,7 +541,6 @@ export default function VentasPage() {
                 <Camera size={18} />
               </button>
 
-              {/* NUEVO BOTÓN: PRODUCTO SUELTO / CARGA RÁPIDA */}
               <button
                 type="button"
                 onClick={() => setMostrarModalSuelto(true)}
@@ -521,14 +564,16 @@ export default function VentasPage() {
                       {item.esPromo && <Tag size={14} className="text-purple-600 shrink-0" />}
                       <div>
                         <p className="font-bold text-gray-800 text-sm">
-                          {item.esPromo ? `[PROMO] ${item.nombre}` : item.nombre}
+                          {item.esPromo ? `[PROMO] ${item.nombre}` : item.nombre} {item.es_fraccionable && <span className="text-[10px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold ml-1">PESO</span>}
                         </p>
                         <p className="text-gray-400">
                           {item.esPromo ? 'Combo / Oferta' : `Stock: ${item.stock_actual} un. | Cód: ${item.codigo_barras || 'Sin código'}`}
                         </p>
                       </div>
                     </div>
-                    <span className="font-extrabold text-green-600 text-base">${item.precio}</span>
+                    <span className="font-extrabold text-green-600 text-base">
+                      ${item.es_fraccionable ? (item.precio_venta_100g || item.precio) + ' /100g' : item.precio}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -717,6 +762,83 @@ export default function VentasPage() {
         </div>
 
       </div>
+
+      {/* MODAL DE PESO / PRODUCTO FRACCIONABLE */}
+      {mostrarModalPeso && productoAFraccionar && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative shadow-2xl">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b">
+              <div>
+                <h3 className="font-bold text-gray-800 text-base">{productoAFraccionar.nombre}</h3>
+                <p className="text-xs text-indigo-600 font-semibold">
+                  Precio cada 100g: ${productoAFraccionar.precio_venta_100g || productoAFraccionar.precio}
+                </p>
+              </div>
+              <button
+                onClick={() => setMostrarModalPeso(false)}
+                className="p-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={confirmarPesoFraccionable} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Cantidad en Gramos (g)</label>
+                <div className="flex gap-2 mb-2">
+                  {[100, 150, 200, 250, 500].map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setGramosInput(g.toString())}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition ${
+                        gramosInput === g.toString()
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {g}g
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  step="1"
+                  value={gramosInput}
+                  onChange={(e) => setGramosInput(e.target.value)}
+                  placeholder="Ej: 250"
+                  required
+                  autoFocus
+                  className="w-full p-3 border rounded-xl bg-gray-50 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="bg-indigo-50 p-3 rounded-xl flex justify-between items-center text-xs">
+                <span className="text-indigo-900 font-medium">Subtotal calculado:</span>
+                <span className="text-indigo-700 font-extrabold text-base">
+                  ${(((parseFloat(gramosInput) || 0) / 100) * (productoAFraccionar.precio_venta_100g || productoAFraccionar.precio)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarModalPeso(false)}
+                  className="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold text-xs transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <Check size={16} /> Confirmar Peso
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE PRODUCTO SUELTO / CARGA RÁPIDA */}
       {mostrarModalSuelto && (

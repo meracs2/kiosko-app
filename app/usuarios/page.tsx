@@ -63,10 +63,8 @@ export default function UsuariosPage() {
     setMensaje('')
 
     try {
-      // 1. Guardamos la sesión actual del Admin antes de crear el usuario
       const { data: sesionActual } = await supabase.auth.getSession()
 
-      // 2. Creamos el usuario
       const { error: errorAuth } = await supabase.auth.signUp({
         email,
         password,
@@ -82,7 +80,6 @@ export default function UsuariosPage() {
 
       if (errorAuth) throw errorAuth
 
-      // 3. Restauramos instantáneamente la sesión del Admin para que no se desconecte
       if (sesionActual && sesionActual.session) {
         await supabase.auth.setSession({
           access_token: sesionActual.session.access_token,
@@ -141,7 +138,7 @@ export default function UsuariosPage() {
 
       if (error) throw error
 
-      setMensaje('✅ Usuario actualizado con éxito')
+      setMensaje('✅ Usuario y turnos actualizados con éxito')
       setUsuarioEditando(null)
       cargarUsuarios()
     } catch (err: unknown) {
@@ -284,7 +281,7 @@ export default function UsuariosPage() {
         </div>
       )}
 
-      {/* LISTA DE PERSONAL (GRILLA ADAPTABLE) */}
+      {/* LISTA DE PERSONAL */}
       <div className="bg-white rounded-2xl shadow-xs p-6 border border-slate-100">
         <h2 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3 text-base flex items-center gap-2">
           <Users size={18} className="text-slate-600" /> Lista de Personal Registrado
