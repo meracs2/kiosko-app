@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Lock, FileText, TrendingDown } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Lock, FileText, TrendingDown, History, Eye, ArrowRight } from 'lucide-react'
 
 interface DetalleVenta {
   id: string
@@ -23,7 +23,6 @@ interface Venta {
   pago_transferencia?: number
 }
 
-// Nueva interfaz para los gastos/movimientos
 interface Movimiento {
   id: string
   created_at?: string
@@ -33,15 +32,43 @@ interface Movimiento {
   monto: number
 }
 
+interface CierreHistorico {
+  id: string
+  created_at: string
+  total_neto: number
+  efectivo_manual: number
+  diferencia_efectivo: number
+  inicio_turno?: string
+  fin_turno?: string
+}
+
 export default function CajaPage() {
   const [ventas, setVentas] = useState<Venta[]>([])
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+  const [historialCierres, setHistorialCierres] = useState<CierreHistorico[]>([])
+  const [mostrarHistorial, setMostrarHistorial] = useState(false)
+  
+  // Estado para ver el detalle de un turno histórico seleccionado
+  const [cierreSeleccionado, setCierreSeleccionado] = useState<CierreHistorico | null>(null)
+
   const [cargando, setCargando] = useState(true)
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null)
   const [kioskoId, setKioskoId] = useState<string | null>(null)
   
   const [detallesMap, setDetallesMap] = useState<{ [key: string]: DetalleVenta[] }>({})
-  const [ultimoCierre, setUltimoCierre] = useState<number>(0)
+  
+  // Inicializamos leyendo el último cierre guardado en localStorage o por defecto las 00:00 hs de hoy
+  const [ultimoCierre, setUltimoCierre] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const guardado = localStorage.getItem('kiosko_ultimo_cierre')
+      if (guardado) return Number(guardado)
+
+      const hoyInicio = new Date()
+      hoyInicio.setHours(0, 0, 0, 0)
+      return hoyInicio.getTime()
+    }
+    return 0
+  })
 
   const [manualEfectivo, setManualEfectivo] = useState('')
   const [manualTarjeta, setManualTarjeta] = useState('')
@@ -50,30 +77,26 @@ export default function CajaPage() {
   const fetchDatosCaja = async (idKiosko: string) => {
     setCargando(true)
     
-    // 1. Traemos las ventas
     const resVentas = await supabase
       .from('ventas')
       .select('*')
       .eq('kiosko_id', idKiosko)
       .order('created_at', { ascending: false })
 
-    // 2. Traemos los movimientos
     const resMovimientos = await supabase
       .from('movimientos_caja')
       .select('*')
       .order('created_at', { ascending: false }) 
 
-    if (resVentas.error) {
-      console.error('Error al cargar ventas:', resVentas.error)
-    } else if (resVentas.data) {
-      setVentas(resVentas.data)
-    }
+    const resCierres = await supabase
+      .from('cierres_caja')
+      .select('*')
+      .eq('kiosko_id', idKiosko)
+      .order('created_at', { ascending: false })
 
-    if (resMovimientos.error) {
-      console.error('Error al cargar movimientos:', resMovimientos.error)
-    } else if (resMovimientos.data) {
-      setMovimientos(resMovimientos.data)
-    }
+    if (resVentas.data) setVentas(resVentas.data)
+    if (resMovimientos.data) setMovimientos(resMovimientos.data)
+    if (resCierres.data) setHistorialCierres(resCierres.data)
 
     setCargando(false)
   }
@@ -95,47 +118,46 @@ export default function CajaPage() {
       }
     }
     inicializarKiosko()
-
-    // REINICIO AUTOMÁTICO A LAS 00:00 HS DE HOY
-    const timeoutId = window.setTimeout(() => {
-      const hoy = new Date()
-      hoy.setHours(0, 0, 0, 0)
-      setUltimoCierre(hoy.getTime())
-    }, 0)
-
-    return () => window.clearTimeout(timeoutId)
   }, [])
 
-  // Filtrar datos por el turno actual
-  const ventasDelTurno = ventas.filter((v) => new Date(v.created_at).getTime() > ultimoCierre)
-  const gastosDelTurno = movimientos.filter((m) => {
-    const fechaMs = new Date(m.created_at || m.fecha || '').getTime()
-    return fechaMs > ultimoCierre && m.tipo_movimiento === 'gasto'
-  })
+  // Filtrar datos según el turno actual o el cierre seleccionado del historial
+  const ventasDelTurno = cierreSeleccionado 
+    ? ventas.filter((v) => {
+        const t = new Date(v.created_at).getTime()
+        const inicio = cierreSeleccionado.inicio_turno ? new Date(cierreSeleccionado.inicio_turno).getTime() : 0
+        const fin = new Date(cierreSeleccionado.created_at).getTime()
+        return t >= inicio && t <= fin
+      })
+    : ventas.filter((v) => new Date(v.created_at).getTime() > ultimoCierre)
 
-  // Cálculos de Ventas (Ingresos)
+  const gastosDelTurno = cierreSeleccionado
+    ? movimientos.filter((m) => {
+        const fechaMs = new Date(m.created_at || m.fecha || '').getTime()
+        const inicio = cierreSeleccionado.inicio_turno ? new Date(cierreSeleccionado.inicio_turno).getTime() : 0
+        const fin = new Date(cierreSeleccionado.created_at).getTime()
+        return fechaMs >= inicio && fechaMs <= fin && m.tipo_movimiento === 'gasto'
+      })
+    : movimientos.filter((m) => {
+        const fechaMs = new Date(m.created_at || m.fecha || '').getTime()
+        return fechaMs > ultimoCierre && m.tipo_movimiento === 'gasto'
+      })
+
   const ventasEfectivo = ventasDelTurno.reduce((acc, v) => acc + Number(v.pago_efectivo ?? (v.metodo_pago === 'efectivo' ? v.total : 0)), 0)
   const sisTarjeta = ventasDelTurno.reduce((acc, v) => acc + Number(v.pago_tarjeta ?? (v.metodo_pago === 'tarjeta' ? v.total : 0)), 0)
   const sisTransf = ventasDelTurno.reduce((acc, v) => acc + Number(v.pago_transferencia ?? (v.metodo_pago === 'transferencia' ? v.total : 0)), 0)
   
   const ingresosBrutos = ventasEfectivo + sisTarjeta + sisTransf
+  const totalGastos = gastosDelTurno.reduce((acc, m) => acc + Number(m.monto), 0)
 
-  // Cálculos de Gastos
-  const totalGastos = gastosDelTurno.reduce((acc, m) => acc + Number(m.monto), 0) // El monto ya viene en negativo
-
-  // Cálculos Netos del Sistema
-  const sisEfectivo = ventasEfectivo + totalGastos // Se suma porque totalGastos es negativo
+  const sisEfectivo = ventasEfectivo + totalGastos 
   const sisTotal = sisEfectivo + sisTarjeta + sisTransf
 
-  // Valores del arqueo manual
   const valEfectivo = parseFloat(manualEfectivo) || 0
   const valTarjeta = parseFloat(manualTarjeta) || 0
   const valTransf = parseFloat(manualTransf) || 0
   const totalManual = valEfectivo + valTarjeta + valTransf
 
-  // Diferencia general (Debería ser evaluada principalmente sobre el efectivo físico)
   const diferenciaEfectivo = valEfectivo - sisEfectivo
-  const diferenciaTotal = totalManual - sisTotal
 
   const toggleExpandir = async (id: string) => {
     if (ventaExpandida === id) {
@@ -145,7 +167,6 @@ export default function CajaPage() {
       
       if (!detallesMap[id]) {
         let itemsEncontrados: DetalleVenta[] = []
-
         const res1 = await supabase.from('detalle_ventas').select('*').eq('venta_id', id)
         
         if (res1.data && res1.data.length > 0) itemsEncontrados = res1.data
@@ -173,33 +194,6 @@ export default function CajaPage() {
     csvContent += `Ingresos por Ventas,$${ingresosBrutos}\n`;
     csvContent += `Gastos (Proveedores/Retiros),-$${Math.abs(totalGastos)}\n`;
     csvContent += `TOTAL NETO ESPERADO,$${sisTotal}\n\n`;
-    
-    csvContent += `Efectivo Neto Esperado,$${sisEfectivo} (Ventas: $${ventasEfectivo} - Gastos: $${Math.abs(totalGastos)})\n`;
-    csvContent += `Tarjeta Sistema,$${sisTarjeta}\n`;
-    csvContent += `Transferencia Sistema,$${sisTransf}\n\n`;
-
-    csvContent += "ARQUEO MANUAL / FISICO\n";
-    csvContent += `Efectivo Físico en Caja,$${valEfectivo}\n`;
-    csvContent += `Total Tarjeta,$${valTarjeta}\n`;
-    csvContent += `Total Transferencias,$${valTransf}\n`;
-    csvContent += `Total Ingresado Manualmente,$${totalManual}\n`;
-    csvContent += `Diferencia de Efectivo (Sobrante/Faltante),$${diferenciaEfectivo}\n\n`;
-
-    if (gastosDelTurno.length > 0) {
-      csvContent += "DETALLE DE GASTOS DEL TURNO\n";
-      csvContent += "Descripción,Total\n";
-      gastosDelTurno.forEach((g) => {
-        csvContent += `"${g.descripcion}",$${g.monto}\n`;
-      });
-      csvContent += "\n";
-    }
-
-    csvContent += "DETALLE DE VENTAS DEL TURNO\n";
-    csvContent += "ID Venta,Fecha y Hora,Método,Total\n";
-    ventasDelTurno.forEach((v) => {
-      const fechaVenta = new Date(v.created_at).toLocaleString();
-      csvContent += `"${v.id}","${fechaVenta}","${v.metodo_pago}",$${v.total}\n`;
-    });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -210,17 +204,45 @@ export default function CajaPage() {
     document.body.removeChild(link);
   }
 
-  const handleCerrarTurno = () => {
+  const handleCerrarTurno = async () => {
     if (ventasDelTurno.length === 0 && gastosDelTurno.length === 0) {
       alert('No hay ventas ni gastos registrados en este turno para cerrar.')
       return
     }
-    if (!window.confirm('¿Estás seguro de cerrar el turno actual?')) return
+    if (!window.confirm('¿Estás seguro de cerrar el turno actual y guardarlo en el historial?')) return
+
+    const inicioTurnoFecha = new Date(ultimoCierre > 0 ? ultimoCierre : (ventas[ventas.length - 1]?.created_at || Date.now())).toISOString()
+    const finTurnoFecha = new Date().toISOString()
+
+    const { error } = await supabase.from('cierres_caja').insert({
+      kiosko_id: kioskoId,
+      ingresos_ventas: ingresosBrutos,
+      total_gastos: totalGastos,
+      total_neto: sisTotal,
+      efectivo_sistema: sisEfectivo,
+      tarjeta_sistema: sisTarjeta,
+      transferencia_sistema: sisTransf,
+      efectivo_manual: valEfectivo,
+      tarjeta_manual: valTarjeta,
+      transferencia_manual: valTransf,
+      diferencia_efectivo: diferenciaEfectivo,
+      total_manual: totalManual,
+      inicio_turno: inicioTurnoFecha,
+      fin_turno: finTurnoFecha
+    })
+
+    if (error) {
+      alert(`Error al guardar el cierre en Supabase: ${error.message}`)
+      return
+    }
 
     const ahoraMs = Date.now()
     localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
     setUltimoCierre(ahoraMs)
-    alert('¡Turno cerrado con éxito!')
+    setCierreSeleccionado(null)
+
+    if (kioskoId) fetchDatosCaja(kioskoId)
+    alert('¡Turno cerrado y guardado en el historial con éxito!')
   }
 
   const handleGuardarExcel = () => {
@@ -233,11 +255,10 @@ export default function CajaPage() {
 
   const handleReiniciarCaja = () => {
     if (!window.confirm('¿Estás seguro de reiniciar los contadores manuales de caja?')) return
-
     setManualEfectivo('')
     setManualTarjeta('')
     setManualTransf('')
-    alert('¡Caja e inputs manuales reiniciados con éxito!')
+    alert('¡Inputs manuales reiniciados con éxito!')
   }
 
   return (
@@ -252,17 +273,29 @@ export default function CajaPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 leading-tight">Caja Diaria</h1>
-            <p className="text-xs text-gray-500">Resumen de ventas y gastos del turno</p>
+            <p className="text-xs text-gray-500">
+              {cierreSeleccionado ? `Viendo cierre histórico (${new Date(cierreSeleccionado.created_at).toLocaleString()})` : 'Resumen de ventas y gastos del turno'}
+            </p>
           </div>
         </div>
 
-        <button
-          onClick={() => kioskoId && fetchDatosCaja(kioskoId)}
-          className="bg-white border text-gray-700 p-2.5 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition flex items-center gap-1.5 text-xs font-semibold"
-        >
-          <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Actualizar</span>
-        </button>
+        <div className="flex gap-2">
+          {cierreSeleccionado && (
+            <button
+              onClick={() => setCierreSeleccionado(null)}
+              className="bg-amber-100 border border-amber-300 text-amber-800 px-3 py-2 rounded-xl text-xs font-bold hover:bg-amber-200 transition flex items-center gap-1"
+            >
+              Volver al Turno Actual
+            </button>
+          )}
+          <button
+            onClick={() => kioskoId && fetchDatosCaja(kioskoId)}
+            className="bg-white border text-gray-700 p-2.5 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
@@ -270,16 +303,14 @@ export default function CajaPage() {
         {/* Columna Izquierda: Arqueo, Totales y Cierre */}
         <div className="md:col-span-5 space-y-6">
           
-          {/* Resumen del Sistema */}
           <div className="bg-gray-900 text-white p-5 rounded-2xl shadow-md">
             <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1">
-              Total Neto en Caja
+              {cierreSeleccionado ? 'Total Neto Histórico' : 'Total Neto en Caja'}
             </div>
             <div className="text-3xl font-extrabold text-green-400 mb-4">
               ${sisTotal.toLocaleString()}
             </div>
             
-            {/* Desglose Ingresos / Gastos */}
             <div className="flex flex-col gap-1.5 pb-4 border-b border-gray-800 text-sm">
               <div className="flex justify-between items-center text-gray-300">
                 <span>Ingresos por Ventas:</span>
@@ -307,7 +338,6 @@ export default function CajaPage() {
             </div>
           </div>
 
-          {/* Arqueo Manual */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <h2 className="font-bold text-gray-700 mb-4 border-b pb-3 flex items-center gap-2 text-sm">
               <Calculator size={18} />
@@ -389,13 +419,15 @@ export default function CajaPage() {
             )}
 
             <div className="space-y-2.5 mt-5">
-              <button
-                onClick={handleCerrarTurno}
-                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
-              >
-                <Lock size={16} />
-                Cerrar Turno
-              </button>
+              {!cierreSeleccionado && (
+                <button
+                  onClick={handleCerrarTurno}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
+                >
+                  <Lock size={16} />
+                  Cerrar Turno y Guardar
+                </button>
+              )}
 
               <button
                 onClick={handleGuardarExcel}
@@ -406,115 +438,175 @@ export default function CajaPage() {
               </button>
 
               <button
-                onClick={handleReiniciarCaja}
-                className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
+                onClick={() => setMostrarHistorial(!mostrarHistorial)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow transition active:scale-95 flex items-center justify-center gap-2 text-sm"
               >
-                <RefreshCw size={16} />
-                Reiniciar Inputs
+                <History size={16} />
+                {mostrarHistorial ? 'Ocultar Historial' : `Ver Historial de Cierres (${historialCierres.length})`}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Columna Derecha: Historial de Ventas y Gastos */}
+        {/* Columna Derecha: Historial de Cierres o Ventas del Turno */}
         <div className="md:col-span-7 bg-white rounded-2xl shadow-sm p-5">
           
-          {/* SECCIÓN DE GASTOS */}
-          {gastosDelTurno.length > 0 && (
-            <div className="mb-6">
-              <h2 className="font-bold text-red-600 mb-3 border-b border-red-100 pb-2 flex items-center gap-2 text-sm">
-                <TrendingDown size={18} />
-                Gastos / Salidas del Turno ({gastosDelTurno.length})
+          {mostrarHistorial ? (
+            <div>
+              <h2 className="font-bold text-indigo-600 mb-4 border-b pb-3 flex items-center gap-2 text-sm">
+                <History size={18} />
+                Historial de Cierres Guardados ({historialCierres.length})
               </h2>
-              <div className="space-y-2">
-                {gastosDelTurno.map(g => (
-                  <div key={g.id} className="flex justify-between items-center bg-red-50 p-2.5 rounded-xl border border-red-100">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">{g.descripcion}</p>
-                      <span className="text-xs text-gray-500">
-                        {new Date(g.created_at || g.fecha || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <span className="font-bold text-red-600">
-                      ${g.monto.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* SECCIÓN DE VENTAS */}
-          <h2 className="font-bold text-gray-700 mb-4 border-b pb-3 flex items-center gap-2 text-sm mt-2">
-            <Calendar size={18} />
-            Ventas del Turno ({ventasDelTurno.length})
-          </h2>
-
-          {ventasDelTurno.length === 0 ? (
-            <p className="text-center text-gray-400 py-8 text-sm">No hay ventas registradas.</p>
-          ) : (
-            <div className="divide-y max-h-[520px] overflow-y-auto pr-1">
-              {ventasDelTurno.map((v) => {
-                const estaExpandida = ventaExpandida === v.id
-                const itemsVenta = detallesMap[v.id]
-
-                return (
-                  <div key={v.id} className="py-3">
-                    <button
-                      onClick={() => toggleExpandir(v.id)}
-                      className="w-full flex justify-between items-center text-left focus:outline-none hover:bg-gray-50 p-2 rounded-xl transition"
-                    >
+              {historialCierres.length === 0 ? (
+                <p className="text-center text-gray-400 py-8 text-sm">No hay cierres guardados todavía.</p>
+              ) : (
+                <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                  {historialCierres.map((cierre) => (
+                    <div key={cierre.id} className="p-4 rounded-xl border bg-gray-50 flex justify-between items-center hover:border-indigo-300 transition">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-gray-800 text-sm">
-                            ${Number(v.total).toLocaleString()}
-                          </p>
-                          <span
-                            className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded-md ${
-                              v.metodo_pago === 'efectivo'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : v.metodo_pago === 'tarjeta'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-purple-100 text-purple-700'
-                            }`}
-                          >
-                            {v.metodo_pago}
+                        <p className="text-xs font-semibold text-gray-500">
+                          {new Date(cierre.created_at).toLocaleString('es-AR')}
+                        </p>
+                        <p className="text-sm font-bold text-gray-800 mt-0.5">
+                          Total Neto: ${Number(cierre.total_neto).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Efectivo Físico: ${Number(cierre.efectivo_manual).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className={`text-xs px-2.5 py-1 rounded-lg font-bold ${Number(cierre.diferencia_efectivo) === 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          Dif: ${Number(cierre.diferencia_efectivo).toLocaleString()}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setCierreSeleccionado(cierre)
+                            setMostrarHistorial(false)
+                          }}
+                          className="bg-indigo-600 text-white p-2 rounded-xl hover:bg-indigo-700 transition"
+                          title="Ver movimientos de este día"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              {cierreSeleccionado && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex justify-between items-center text-xs">
+                  <span className="font-semibold text-amber-800">
+                    Visualizando ventas del turno cerrado el: {new Date(cierreSeleccionado.created_at).toLocaleString()}
+                  </span>
+                  <button 
+                    onClick={() => setCierreSeleccionado(null)}
+                    className="text-amber-900 underline font-bold"
+                  >
+                    Salir
+                  </button>
+                </div>
+              )}
+
+              {gastosDelTurno.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="font-bold text-red-600 mb-3 border-b border-red-100 pb-2 flex items-center gap-2 text-sm">
+                    <TrendingDown size={18} />
+                    Gastos / Salidas del Turno ({gastosDelTurno.length})
+                  </h2>
+                  <div className="space-y-2">
+                    {gastosDelTurno.map(g => (
+                      <div key={g.id} className="flex justify-between items-center bg-red-50 p-2.5 rounded-xl border border-red-100">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{g.descripcion}</p>
+                          <span className="text-xs text-gray-500">
+                            {new Date(g.created_at || g.fecha || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <span className="text-xs text-gray-400">
-                          {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 
-                          {itemsVenta ? ` (${itemsVenta.length} ítems)` : ' (Ver detalle)'}
+                        <span className="font-bold text-red-600">
+                          ${g.monto.toLocaleString()}
                         </span>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                      <div className="text-gray-400">
-                        {estaExpandida ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </div>
-                    </button>
+              <h2 className="font-bold text-gray-700 mb-4 border-b pb-3 flex items-center gap-2 text-sm mt-2">
+                <Calendar size={18} />
+                {cierreSeleccionado ? 'Ventas en este Cierre' : 'Ventas del Turno'} ({ventasDelTurno.length})
+              </h2>
 
-                    {estaExpandida && (
-                      <div className="mt-2 ml-2 pl-3 border-l-2 border-blue-500 bg-gray-50 p-3 rounded-r-xl space-y-1.5">
-                        {!itemsVenta ? (
-                          <p className="text-xs text-gray-400 py-1">Cargando productos...</p>
-                        ) : itemsVenta.length === 0 ? (
-                          <p className="text-xs text-gray-400 py-1">Esta venta no registró detalle.</p>
-                        ) : (
-                          itemsVenta.map((item, idx) => (
-                            <div key={item.id || idx} className="flex justify-between items-center text-xs">
-                              <span className="text-gray-700 font-medium">
-                                {item.cantidad ?? 1}x {item.nombre_producto ?? item.producto_nombre ?? 'Producto sin nombre'}
-                              </span>
-                              <span className="text-gray-500 font-semibold">
-                                ${((item.precio_unitario || 0) * (item.cantidad || 1)).toLocaleString()}
+              {ventasDelTurno.length === 0 ? (
+                <p className="text-center text-gray-400 py-8 text-sm">No hay ventas registradas en este período.</p>
+              ) : (
+                <div className="divide-y max-h-[520px] overflow-y-auto pr-1">
+                  {ventasDelTurno.map((v) => {
+                    const estaExpandida = ventaExpandida === v.id
+                    const itemsVenta = detallesMap[v.id]
+
+                    return (
+                      <div key={v.id} className="py-3">
+                        <button
+                          onClick={() => toggleExpandir(v.id)}
+                          className="w-full flex justify-between items-center text-left focus:outline-none hover:bg-gray-50 p-2 rounded-xl transition"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-gray-800 text-sm">
+                                ${Number(v.total).toLocaleString()}
+                              </p>
+                              <span
+                                className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded-md ${
+                                  v.metodo_pago === 'efectivo'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : v.metodo_pago === 'tarjeta'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-purple-100 text-purple-700'
+                                }`}
+                              >
+                                {v.metodo_pago}
                               </span>
                             </div>
-                          ))
+                            <span className="text-xs text-gray-400">
+                              {new Date(v.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} 
+                              {itemsVenta ? ` (${itemsVenta.length} ítems)` : ' (Ver detalle)'}
+                            </span>
+                          </div>
+
+                          <div className="text-gray-400">
+                            {estaExpandida ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </div>
+                        </button>
+
+                        {estaExpandida && (
+                          <div className="mt-2 ml-2 pl-3 border-l-2 border-blue-500 bg-gray-50 p-3 rounded-r-xl space-y-1.5">
+                            {!itemsVenta ? (
+                              <p className="text-xs text-gray-400 py-1">Cargando productos...</p>
+                            ) : itemsVenta.length === 0 ? (
+                              <p className="text-xs text-gray-400 py-1">Esta venta no registró detalle.</p>
+                            ) : (
+                              itemsVenta.map((item, idx) => (
+                                <div key={item.id || idx} className="flex justify-between items-center text-xs">
+                                  <span className="text-gray-700 font-medium">
+                                    {item.cantidad ?? 1}x {item.nombre_producto ?? item.producto_nombre ?? 'Producto sin nombre'}
+                                  </span>
+                                  <span className="text-gray-500 font-semibold">
+                                    ${((item.precio_unitario || 0) * (item.cantidad || 1)).toLocaleString()}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
