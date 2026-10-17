@@ -57,15 +57,20 @@ export default function CajaPage() {
   
   const [detallesMap, setDetallesMap] = useState<{ [key: string]: DetalleVenta[] }>({})
   
-  // Inicializamos leyendo el último cierre guardado en localStorage o por defecto las 00:00 hs de hoy
+  // CORREGIDO: Valida que si el guardado es viejo (de otro día), lo ignore y use las 00:00 hs de hoy
   const [ultimoCierre, setUltimoCierre] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const guardado = localStorage.getItem('kiosko_ultimo_cierre')
-      if (guardado) return Number(guardado)
-
+      
       const hoyInicio = new Date()
       hoyInicio.setHours(0, 0, 0, 0)
-      return hoyInicio.getTime()
+      const hoyInicioMs = hoyInicio.getTime()
+
+      if (guardado && Number(guardado) >= hoyInicioMs) {
+        return Number(guardado)
+      }
+
+      return hoyInicioMs
     }
     return 0
   })
