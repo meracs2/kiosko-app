@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Lock, FileText, TrendingDown, History, Eye, ArrowRight } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Calendar, Banknote, CreditCard, QrCode, Calculator, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Lock, FileText, TrendingDown, History, Eye } from 'lucide-react'
 
 interface DetalleVenta {
   id: string
@@ -48,37 +48,21 @@ export default function CajaPage() {
   const [historialCierres, setHistorialCierres] = useState<CierreHistorico[]>([])
   const [mostrarHistorial, setMostrarHistorial] = useState(false)
   
-  // Estado para ver el detalle de un turno histórico seleccionado
   const [cierreSeleccionado, setCierreSeleccionado] = useState<CierreHistorico | null>(null)
-
   const [cargando, setCargando] = useState(true)
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null)
   const [kioskoId, setKioskoId] = useState<string | null>(null)
   
   const [detallesMap, setDetallesMap] = useState<{ [key: string]: DetalleVenta[] }>({})
   
-  // CORREGIDO: Valida que si el guardado es viejo (de otro día), lo ignore y use las 00:00 hs de hoy
-  const [ultimoCierre, setUltimoCierre] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const guardado = localStorage.getItem('kiosko_ultimo_cierre')
-      
-      const hoyInicio = new Date()
-      hoyInicio.setHours(0, 0, 0, 0)
-      const hoyInicioMs = hoyInicio.getTime()
-
-      if (guardado && Number(guardado) >= hoyInicioMs) {
-        return Number(guardado)
-      }
-
-      return hoyInicioMs
-    }
-    return 0
-  })
+  // FUENTE DE LA VERDAD SUPABASE: Almacena el timestamp del último cierre registrado en la base de datos
+  const [ultimoCierreTime, setUltimoCierreTime] = useState<number>(0)
 
   const [manualEfectivo, setManualEfectivo] = useState('')
   const [manualTarjeta, setManualTarjeta] = useState('')
   const [manualTransf, setManualTransf] = useState('')
 
+  // CONSULTAR DATOS DIRECTAMENTE DESDE SUPABASE (Filtrado estricto por kiosko_id)
   const fetchDatosCaja = async (idKiosko: string) => {
     setCargando(true)
     
@@ -91,8 +75,10 @@ export default function CajaPage() {
     const resMovimientos = await supabase
       .from('movimientos_caja')
       .select('*')
+      .eq('kiosko_id', idKiosko)
       .order('created_at', { ascending: false }) 
 
+    // Consultamos el historial de cierres ordenados del más reciente al más antiguo
     const resCierres = await supabase
       .from('cierres_caja')
       .select('*')
@@ -101,7 +87,23 @@ export default function CajaPage() {
 
     if (resVentas.data) setVentas(resVentas.data)
     if (resMovimientos.data) setMovimientos(resMovimientos.data)
-    if (resCierres.data) setHistorialCierres(resCierres.data)
+
+    if (resCierres.data && resCierres.data.length > 0) {
+      setHistorialCierres(resCierres.data)
+      
+      // El último cierre guardado en Supabase marca el límite del turno actual
+      const ultimoCierreReg = resCierres.data[0]
+      const tiempoFin = new Date(ultimoCierreReg.fin_turno || ultimoCierreReg.created_at).getTime()
+      setUltimoCierreTime(tiempoFin)
+    } else {
+      setHistorialCierres([])
+      
+      // Si la tabla cierres_caja está vacía, por seguridad arrancamos a las 00:00 hs de hoy
+      // para evitar mostrar meses enteros de pruebas viejas.
+      const hoyInicio = new Date()
+      hoyInicio.setHours(0, 0, 0, 0)
+      setUltimoCierreTime(hoyInicio.getTime())
+    }
 
     setCargando(false)
   }
@@ -125,7 +127,7 @@ export default function CajaPage() {
     inicializarKiosko()
   }, [])
 
-  // Filtrar datos según el turno actual o el cierre seleccionado del historial
+  // Filtrar datos estrictamente usando el último cierre obtenido de Supabase
   const ventasDelTurno = cierreSeleccionado 
     ? ventas.filter((v) => {
         const t = new Date(v.created_at).getTime()
@@ -133,7 +135,7 @@ export default function CajaPage() {
         const fin = new Date(cierreSeleccionado.created_at).getTime()
         return t >= inicio && t <= fin
       })
-    : ventas.filter((v) => new Date(v.created_at).getTime() > ultimoCierre)
+    : ventas.filter((v) => new Date(v.created_at).getTime() > ultimoCierreTime)
 
   const gastosDelTurno = cierreSeleccionado
     ? movimientos.filter((m) => {
@@ -144,7 +146,7 @@ export default function CajaPage() {
       })
     : movimientos.filter((m) => {
         const fechaMs = new Date(m.created_at || m.fecha || '').getTime()
-        return fechaMs > ultimoCierre && m.tipo_movimiento === 'gasto'
+        return fechaMs > ultimoCierreTime && m.tipo_movimiento === 'gasto'
       })
 
   const ventasEfectivo = ventasDelTurno.reduce((acc, v) => acc + Number(v.pago_efectivo ?? (v.metodo_pago === 'efectivo' ? v.total : 0)), 0)
@@ -209,14 +211,15 @@ export default function CajaPage() {
     document.body.removeChild(link);
   }
 
+  // CIERRE ESTRICTAMENTE MANUAL: Guarda en Supabase y actualiza leyendo la base de datos
   const handleCerrarTurno = async () => {
     if (ventasDelTurno.length === 0 && gastosDelTurno.length === 0) {
       alert('No hay ventas ni gastos registrados en este turno para cerrar.')
       return
     }
-    if (!window.confirm('¿Estás seguro de cerrar el turno actual y guardarlo en el historial?')) return
+    if (!window.confirm('¿Estás seguro de cerrar el turno actual y guardarlo en Supabase?')) return
 
-    const inicioTurnoFecha = new Date(ultimoCierre > 0 ? ultimoCierre : (ventas[ventas.length - 1]?.created_at || Date.now())).toISOString()
+    const inicioTurnoFecha = new Date(ultimoCierreTime > 0 ? ultimoCierreTime : (ventas[ventas.length - 1]?.created_at || Date.now())).toISOString()
     const finTurnoFecha = new Date().toISOString()
 
     const { error } = await supabase.from('cierres_caja').insert({
@@ -241,13 +244,14 @@ export default function CajaPage() {
       return
     }
 
-    const ahoraMs = Date.now()
-    localStorage.setItem('kiosko_ultimo_cierre', ahoraMs.toString())
-    setUltimoCierre(ahoraMs)
     setCierreSeleccionado(null)
 
-    if (kioskoId) fetchDatosCaja(kioskoId)
-    alert('¡Turno cerrado y guardado en el historial con éxito!')
+    // Recargamos los datos directamente desde Supabase para actualizar el último cierre
+    if (kioskoId) {
+      await fetchDatosCaja(kioskoId)
+    }
+
+    alert('¡Turno cerrado y guardado en Supabase con éxito!')
   }
 
   const handleGuardarExcel = () => {
